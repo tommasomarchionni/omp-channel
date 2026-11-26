@@ -1,19 +1,24 @@
 #!/usr/bin/env node
 // Real Oh My Pi check for omp-channel (see docs/omp-verification.md).
 //
-// It starts Oh My Pi in RPC mode with this extension and the example MCP server, then checks:
-//   1. an MCP push reaches an idle agent and starts a turn;
-//   2. a push that arrives during a turn is queued as a follow-up, after the turn ends;
-//   3. abort stops the turn, and tool results produced before it are kept.
+// Starts the `omp` command in RPC mode with this extension and the example MCP server, using the
+// maintainer's default configuration unchanged (no profile, no test home, no environment overrides).
+// Checks: an MCP push reaches an idle agent and starts a turn; a push during a turn is queued after
+// it; a shell tool run followed by abort stops the turn and keeps the tool output.
 //
-// It needs a model and runs a real turn, so it does nothing unless you ask for it:
-//   OMP_E2E=1 OMP_E2E_MODEL=<provider/model> npm run omp:e2e
-// Optional: OMP_E2E_CLI (path to the Oh My Pi cli.js; default: the devDependency) and
-// OMP_E2E_BUN (Bun >= 1.4.4; default: "bun"). It never sends anything to a service: the only
-// peer is the example MCP server on this machine. The model is whatever you pass.
+// It runs a model, so it does nothing unless asked:
+//   OMP_E2E=1 OMP_E2E_MODEL=<provider/model-id> npm run omp:e2e
+//
+// Optional: OMP_E2E_OMP (the omp command, default "omp"), OMP_E2E_BUN_DIR (a folder with a Bun
+// >= 1.4.4 binary, put first on the PATH of the omp process only), OMP_E2E_LOCAL_URL (the local model
+// endpoint checked before starting, default http://127.0.0.1:8888/v1), OMP_E2E_SECOND_AFTER_MS
+// (default 1500).
+//
+// A network guard watches every TCP connection of the omp process tree and fails the run on any
+// non-loopback peer.
 
-import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { execFile, spawn } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,29 +27,34 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const env = process.env;
 
 if (env.OMP_E2E !== "1") {
-  console.log(
-    "skipped: set OMP_E2E=1 and OMP_E2E_MODEL=<provider/model> to run the Oh My Pi check",
-  );
+  console.log("skipped: set OMP_E2E=1 and OMP_E2E_MODEL=<provider/model-id> to run the Oh My Pi check");
   process.exit(0);
 }
 
 function fail(message) {
-  console.error(`omp-e2e: ${message}`);
+  console.error(`omp-e2e: FAILED: ${message}`);
   process.exit(2);
 }
 
 const model = env.OMP_E2E_MODEL;
-if (!model) {
-  fail("OMP_E2E_MODEL is required. The check never uses the default model.");
-}
-const bun = env.OMP_E2E_BUN ?? "bun";
-const cli = env.OMP_E2E_CLI ?? join(root, "node_modules/@oh-my-pi/pi-coding-agent/dist/cli.js");
+if (!model || !model.includes("/")) fail("OMP_E2E_MODEL must be provider/model-id; no model is assumed");
+const localUrl = new URL(env.OMP_E2E_LOCAL_URL ?? "http://127.0.0.1:8888/v1");
+const loopback = (host) => host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1";
+if (!loopback(localUrl.hostname)) fail(`OMP_E2E_LOCAL_URL must be loopback, got ${localUrl.hostname}`);
+const ompCommand = env.OMP_E2E_OMP ?? "omp";
 const extension = join(root, "dist/index.js");
 const server = join(root, "examples/mcp-server/server.mjs");
 if (!existsSync(extension)) fail("dist/index.js is missing: run npm run build first");
-if (!existsSync(cli)) fail(`Oh My Pi cli.js not found at ${cli}`);
 
-const project = mkdtempSync(join(tmpdir(), "omp-channel-e2e-"));
+// Preflight: any HTTP answer from the local endpoint means the model server is up. Whether the
+// model itself answers is checked by the first turn below.
+const preflight = await fetch(new URL("models", `${localUrl.href.replace(/\/$/, "")}/`), {
+  signal: AbortSignal.timeout(5000),
+}).then((response) => response.status, () => 0);
+if (preflight === 0) fail(`the local model endpoint did not answer at ${localUrl.origin}`);
+
+// Temporary project outside the repository: it only holds the MCP server entry for this run.
+const project = mkdtempSync(join(tmpdir(), "omp-channel-e2e-project-"));
 mkdirSync(join(project, ".omp"));
 writeFileSync(
   join(project, ".omp", "mcp.json"),
@@ -52,12 +62,13 @@ writeFileSync(
 );
 
 const child = spawn(
-  bun,
-  [cli, "--mode", "rpc", "--no-session", "--cwd", project, "--model", model, "-e", extension],
+  ompCommand,
+  ["--mode", "rpc", "--no-session", "--cwd", project, "--model", model, "-e", extension],
   {
     cwd: project,
     env: {
       ...env,
+      PATH: env.OMP_E2E_BUN_DIR ? `${env.OMP_E2E_BUN_DIR}:${env.PATH ?? ""}` : env.PATH,
       OMP_CHANNEL_CONFIG: "",
       EXAMPLE_CHANNEL_SECOND_AFTER_MS: env.OMP_E2E_SECOND_AFTER_MS ?? "1500",
     },
@@ -65,6 +76,49 @@ const child = spawn(
   },
 );
 
+// ---- network guard ------------------------------------------------------------------------------
+let violation = "";
+const peersSeen = new Set();
+const run = (file, args) =>
+  new Promise((resolveRun) => {
+    execFile(file, args, { maxBuffer: 1 << 20 }, (error, stdout) => resolveRun(error && !stdout ? "" : String(stdout)));
+  });
+
+async function processTree(rootPid) {
+  const table = await run("ps", ["-A", "-o", "pid=,ppid="]);
+  const children = new Map();
+  for (const line of table.split("\n")) {
+    const [pid, ppid] = line.trim().split(/\s+/).map(Number);
+    if (!Number.isFinite(pid) || !Number.isFinite(ppid)) continue;
+    children.set(ppid, [...(children.get(ppid) ?? []), pid]);
+  }
+  const pids = [rootPid];
+  for (let index = 0; index < pids.length; index += 1) pids.push(...(children.get(pids[index]) ?? []));
+  return pids;
+}
+
+const isLoopbackHost = (host) => host.startsWith("127.") || host === "[::1]" || host === "::1" || host === "localhost";
+
+async function checkNetwork() {
+  const pids = await processTree(child.pid);
+  const output = await run("lsof", ["-a", "-nP", "-iTCP", "-Fn", "-p", pids.join(",")]);
+  for (const line of output.split("\n")) {
+    if (!line.startsWith("n") || !line.includes("->")) continue;
+    const remote = line.split("->")[1] ?? "";
+    const host = remote.slice(0, remote.lastIndexOf(":"));
+    peersSeen.add(remote);
+    if (!isLoopbackHost(host) && violation === "") {
+      violation = `connection to a non-local host: ${host}`;
+      child.kill("SIGTERM");
+    }
+  }
+}
+
+const guard = setInterval(() => {
+  checkNetwork().catch(() => undefined);
+}, 300);
+
+// ---- RPC plumbing -------------------------------------------------------------------------------
 const frames = [];
 let pending = "";
 let nextId = 1;
@@ -88,17 +142,18 @@ child.stdout.on("data", (chunk) => {
     if (frame.type === "response" && frame.id !== undefined) responses.set(frame.id, frame);
   }
 });
-child.stderr.setEncoding("utf8");
 let stderr = "";
+child.stderr.setEncoding("utf8");
 child.stderr.on("data", (chunk) => {
   stderr += chunk;
 });
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms) => new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
 
 async function waitFor(predicate, label, timeoutMs = 180_000) {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
+    if (violation) throw new Error(violation);
     const found = predicate();
     if (found !== undefined && found !== false) return found;
     await sleep(100);
@@ -109,135 +164,131 @@ async function waitFor(predicate, label, timeoutMs = 180_000) {
 async function command(type, payload = {}) {
   const id = `e2e-${nextId++}`;
   child.stdin.write(`${JSON.stringify({ id, type, ...payload })}\n`);
-  const response = await waitFor(() => responses.get(id), `response to ${type}`, 30_000);
-  if (response.success !== true) throw new Error(`${type} failed: ${response.error ?? "unknown"}`);
+  const response = await waitFor(() => responses.get(id), `response to ${type}`, 60_000);
+  if (response.success !== true) throw new Error(`${type} failed: ${String(response.error ?? "unknown")}`);
   return response.data;
 }
 
-function userTexts(messages) {
-  return (messages ?? []).flatMap((message) => {
-    const content = Array.isArray(message.content) ? message.content : [message.content];
-    return content
-      .map((part) => (typeof part === "string" ? part : (part?.text ?? "")))
-      .filter(Boolean);
-  });
-}
-
-const results = [];
-function record(name, status, detail) {
-  results.push({ name, status, detail });
-  console.log(`${status.toUpperCase().padEnd(15)} ${name}${detail ? ` - ${detail}` : ""}`);
-}
-
-function indexOfFrame(predicate, from = 0) {
-  for (let index = from; index < frames.length; index += 1) {
-    if (predicate(frames[index])) return index;
-  }
-  return -1;
-}
-
 async function waitForIdle(label) {
-  for (let attempt = 0; attempt < 1800; attempt += 1) {
+  for (let attempt = 0; attempt < 3000; attempt += 1) {
     const state = await command("get_state");
-    if (state.isStreaming === false) return;
+    if (state.isStreaming === false) return state;
     await sleep(100);
   }
   throw new Error(`timed out waiting for idle (${label})`);
 }
 
-async function run() {
-  await waitFor(
-    () => frames.some((frame) => frame.type === "ready"),
-    "the RPC ready frame",
-    60_000,
-  );
-  record("startup", "pass", "RPC ready");
+function userTexts(messages) {
+  return (messages ?? []).flatMap((message) => {
+    const content = Array.isArray(message.content) ? message.content : [message.content];
+    return content.map((part) => (typeof part === "string" ? part : part?.text ?? "")).filter(Boolean);
+  });
+}
 
-  // 1 and 2: the first push starts a turn; the second push (sent 1.5 s later) arrives while it may run.
-  await waitFor(
-    () => frames.some((frame) => frame.type === "agent_start"),
-    "the first agent_start",
-  );
-  const firstEnd = await waitFor(() => {
-    const index = frames.findIndex((frame, position) => frame.type === "agent_end" && position > 0);
+// The agent_end frame must carry an assistant answer with text, not an error.
+function assertModelAnswered(index) {
+  const frame = frames[index];
+  const assistant = [...(frame.messages ?? [])].reverse().find((message) => message.role === "assistant");
+  if (!assistant) throw new Error("the model produced no assistant message");
+  if (assistant.stopReason === "error") throw new Error(`the model returned an error: ${String(assistant.errorMessage ?? "error")}`);
+  const text = (Array.isArray(assistant.content) ? assistant.content : []).map((part) => part?.text ?? "").join("");
+  if (text.trim().length === 0) throw new Error("the model answered with no text");
+}
+
+const results = [];
+function record(name, status, detail, durationMs) {
+  results.push({ name, status, detail, durationMs });
+  console.log(`${status.toUpperCase().padEnd(14)} ${name} (${durationMs} ms)${detail ? ` - ${detail}` : ""}`);
+}
+
+async function scenarios() {
+  let started = Date.now();
+  await waitFor(() => frames.some((frame) => frame.type === "ready"), "the RPC ready frame", 60_000);
+  record("startup", "pass", "RPC ready", Date.now() - started);
+
+  // 1. Idle agent: the first push starts a turn that must be answered.
+  started = Date.now();
+  await waitFor(() => frames.some((frame) => frame.type === "agent_start"), "the first agent_start");
+  const firstEndIndex = await waitFor(() => {
+    const index = frames.findIndex((frame) => frame.type === "agent_end");
     return index === -1 ? undefined : index;
   }, "the first agent_end");
+  assertModelAnswered(firstEndIndex);
   await waitForIdle("after the first turn");
   const branch = await command("get_branch_messages");
-  const texts = userTexts(branch.messages).join("\n");
-  record(
-    "MCP push starts a turn",
-    texts.includes('messageId="example-1"') ? "pass" : "fail",
-    "the first message is in the branch",
-  );
-  const secondIndex = frames.findIndex(
-    (frame) => frame.type === "message_start" && JSON.stringify(frame).includes("example-1-2"),
-  );
-  if (secondIndex < 0) {
-    record(
-      "push during a turn is queued after it",
-      "not-exercised",
-      "no message_start for the second push was seen",
-    );
+  const delivered = userTexts(branch.messages).join("\n").includes('messageId="example-1"');
+  if (!delivered) throw new Error("the pushed message is not in the session branch");
+  record("idle push starts a turn", "pass", "push delivered, model answered, message in branch", Date.now() - started);
+
+  // 2. Busy agent: the second push must start only after the turn that is running has ended.
+  started = Date.now();
+  const secondIndex = await waitFor(() => {
+    const index = frames.findIndex((frame) => frame.type === "message_start" && JSON.stringify(frame).includes("example-1-2"));
+    return index === -1 ? undefined : index;
+  }, "the second push", 120_000).catch(() => -1);
+  if (secondIndex === -1) {
+    record("push during a turn is queued", "not-exercised", "the second push did not arrive", Date.now() - started);
   } else {
+    const turnEnd = frames.findIndex((frame, position) => frame.type === "agent_end" && position < secondIndex && position > 0);
+    const queued = turnEnd !== -1 && turnEnd < secondIndex;
     record(
-      "push during a turn is queued after it",
-      secondIndex > firstEnd ? "pass" : "fail",
-      secondIndex > firstEnd
-        ? "the second push starts after the first agent_end"
-        : "the second push started during the first turn",
+      "push during a turn is queued",
+      queued ? "pass" : "fail",
+      queued ? "the second push started after an agent_end" : "the second push started before any agent_end",
+      Date.now() - started,
     );
   }
+  await waitForIdle("after the second push");
 
-  // 3: abort during a tool run keeps the tool result.
+  // 3. Shell tool run, then abort: the tool output must survive the abort.
+  started = Date.now();
   await command("prompt", {
     message: "First run the shell command `echo omp-channel-marker`. Then write a very long story.",
   });
   const toolRan = await waitFor(
     () => frames.some((frame) => frame.type === "tool_execution_end") || undefined,
-    "a tool execution (the model may not call a tool)",
-    120_000,
-  ).then(
-    () => true,
-    () => false,
-  );
+    "a tool execution",
+    180_000,
+  ).then(() => true, (error) => (violation ? Promise.reject(error) : false));
   await command("abort");
-  await waitForIdle("after the abort");
+  const idle = await waitForIdle("after abort");
   if (!toolRan) {
-    record(
-      "abort keeps tool results",
-      "not-exercised",
-      "the model did not run a tool before the abort",
-    );
+    record("abort after a tool run", "not-exercised", "the model did not run the shell tool", Date.now() - started);
   } else {
     const after = await command("get_branch_messages");
     const kept = JSON.stringify(after.messages).includes("omp-channel-marker");
     record(
-      "abort keeps tool results",
+      "abort keeps tool output",
       kept ? "pass" : "fail",
-      "the marker output is still in the branch",
+      kept ? "tool output still in the branch" : "tool output missing after abort",
+      Date.now() - started,
     );
   }
-  const state = await command("get_state");
-  record("agent is idle after abort", state.isStreaming === false ? "pass" : "fail", "");
+  record("agent idle after abort", idle.isStreaming === false ? "pass" : "fail", "", 0);
+
+  // working/free status reports go to a service adapter, which this MCP-only run does not use.
+  record("working/free status to a service", "not-exercised", "no service adapter in this run", 0);
 }
 
 let exitCode = 0;
 try {
-  await run();
+  await scenarios();
 } catch (error) {
   exitCode = 1;
-  record("run", "fail", error instanceof Error ? error.message : String(error));
+  const reason = error instanceof Error ? error.message : String(error);
+  record("run", "fail", reason, 0);
 } finally {
+  clearInterval(guard);
   child.kill("SIGTERM");
   await sleep(500);
   rmSync(project, { recursive: true, force: true });
 }
 
 const failed = results.filter((item) => item.status === "fail");
-console.log(JSON.stringify({ model, results }, null, 2));
+console.log(JSON.stringify({ model, localUrl: localUrl.origin, loopbackPeersSeen: [...peersSeen].sort(), results }, null, 2));
 if (stderr.trim().length > 0) {
-  console.log("--- stderr of the Oh My Pi process (first 2000 characters)");
+  console.log("--- stderr of the omp process (first 2000 characters)");
   console.log(stderr.slice(0, 2000));
 }
-process.exit(exitCode !== 0 || failed.length > 0 ? 1 : 0);
+if (violation) console.error(`omp-e2e: FAILED: ${violation}`);
+process.exit(exitCode !== 0 || failed.length > 0 || violation ? 1 : 0);

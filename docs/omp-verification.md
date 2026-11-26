@@ -14,39 +14,53 @@ Oh My Pi needs **Bun 1.4.4 or later** at runtime.
 | ----------------------------------------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | Oh My Pi starts in RPC mode with `-e dist/index.js`                     | verified     | RPC `ready` frame received                                                                                                                      |
 | The extension module is loaded and its default export runs              | verified     | Oh My Pi printed `[omp-channel] disabled: ...` on stderr when the configuration path did not exist; that line comes only from the loaded module |
-| MCP server connects and `mcp_notification` reaches the extension        | not verified | needs a model turn or a log that shows admission                                                                                                |
-| First push starts a turn on an idle agent                               | not verified | `test/omp-e2e/run.mjs`, scenario 1                                                                                                              |
-| Push during a running turn is queued as follow-up (not steer)           | not verified | scenario 2                                                                                                                                      |
+| MCP server connects and `mcp_notification` reaches the extension        | not verified | the run stopped before any turn (see "Last real run")                                                                                          |
+| First push starts a turn on an idle agent                               | not verified | scenario 1: not reached, see "Last real run"                                                                                                   |
+| Push during a running turn is queued as follow-up (not steer)           | not verified | scenario 2: not reached                                                                                                                         |
 | `sendUserMessage` attribution values (`user`, `agent`) and their effect | open point   | see below                                                                                                                                       |
-| `abort` stops the turn and keeps tool results                           | not verified | scenario 3                                                                                                                                      |
+| `abort` stops the turn and keeps tool results                           | not verified | scenario 3: not reached                                                                                                                         |
 | Agent status (`working`/`free`) reported to a service                   | not verified | needs a service; not part of the script                                                                                                         |
 | Plain JSON Schema tool parameters accepted by Oh My Pi                  | not verified | see "Tool parameter schema" below                                                                                                               |
 
-Notes from the first probes (no prompt was sent by the probes):
-
-- An RPC probe started Oh My Pi with the user's environment. Oh My Pi chose a remote default model
-  (a Hugging Face router). No turn events were seen within 20 seconds, but a turn may have been
-  started by the pushed test message, and the probe did not check for provider requests. The
-  provider's usage log for that time should be checked.
-- A second probe used an isolated `HOME` with no credentials. Oh My Pi then chose a local
-  `llama.cpp` model at `127.0.0.1:8080`, which was listening. No turn events were seen within 15
-  seconds.
-
 ## How to run the check
 
-Prerequisites: Bun 1.4.4 or later, `npm ci`, `npm run build`, and a model that you choose.
+Prerequisites: an `omp` command (Oh My Pi 19.2.1) on the PATH with its default configuration, Bun 1.4.4 or later for it, `npm ci`, `npm run build`, and the model you choose.
 
 ```sh
-OMP_E2E=1 OMP_E2E_MODEL=<provider/model> npm run omp:e2e
+OMP_E2E=1 OMP_E2E_MODEL=unsloth/inkling-2-mini-unsloth:UD-Q4_K_XL OMP_E2E_BUN_DIR=<folder with bun 1.4.4> npm run omp:e2e
 ```
 
 - Without `OMP_E2E=1` the script does nothing and exits 0.
 - Without `OMP_E2E_MODEL` it refuses to run, so the default model is never used.
-- `OMP_E2E_BUN` selects the Bun binary; `OMP_E2E_CLI` selects another Oh My Pi `cli.js`.
-- The script starts the example MCP server on this machine. It contacts no other host itself, but
-  the model you select may be a remote service, and a turn is a paid request in that case.
+- The script starts `omp` (`OMP_E2E_OMP` changes the command) in RPC mode, with the default
+  configuration of the machine, unchanged. It adds only the extension, a temporary project with the
+  example MCP server, `OMP_CHANNEL_CONFIG` empty, and `OMP_E2E_BUN_DIR` (a folder put first on the PATH
+  of the `omp` process, to provide Bun 1.4.4 without changing the system Bun).
+- A network guard checks every TCP connection of the `omp` process tree every 300 ms. On the first
+  connection to a non-loopback address it stops `omp` and fails the run. A run that fails this way
+  is not a pass for any scenario.
+- The script never edits the configuration. The default configuration has remote fallback chains,
+  web search and automatic update checks; this is a risk for the maintainer to fix, not something
+  this script changes.
 
 The script prints one line per check (`pass`, `fail` or `not-exercised`) and a JSON summary.
+
+### Last real run
+
+Command: `OMP_E2E=1 OMP_E2E_MODEL=unsloth/inkling-2-mini-unsloth:UD-Q4_K_XL OMP_E2E_BUN_DIR=<folder with bun 1.4.4> npm run omp:e2e`
+(Oh My Pi 19.2.1, the default configuration, the local endpoint at `127.0.0.1:8888`).
+
+| Check               | Result        | Duration | What was observed                                                                 |
+| ------------------- | ------------- | -------- | -------------------------------------------------------------------------------- |
+| startup             | pass          | 807 ms   | RPC `ready` frame received                                                        |
+| run (scenarios 1-3) | fail (guard)  | 0 ms     | `omp` connected to a non-loopback address (`104.26.10.114:443`) before any turn   |
+
+Other loopback peers seen: `127.0.0.1:8888` (the model endpoint) and `127.0.0.1:11434`, which was not
+identified. Earlier runs of the same script stopped the same way, on another non-loopback address
+(`172.67.75.165:443`). The cause of the remote connection was not identified: it happens before any
+scenario, and the configuration was not inspected beyond its structure. No scenario was executed, so
+the model answer, delivery, ack, branch response, `working`/`free` status and `abort` remain not
+verified.
 
 ### Scenarios
 
