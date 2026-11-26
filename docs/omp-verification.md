@@ -27,7 +27,7 @@ Oh My Pi needs **Bun 1.4.4 or later** at runtime.
 Prerequisites: an `omp` command (Oh My Pi 19.2.1) on the PATH with its default configuration, Bun 1.4.4 or later for it, `npm ci`, `npm run build`, and the model you choose.
 
 ```sh
-OMP_E2E=1 OMP_E2E_MODEL=unsloth/inkling-2-mini-unsloth:UD-Q4_K_XL OMP_E2E_BUN_DIR=<folder with bun 1.4.4> npm run omp:e2e
+OMP_E2E=1 OMP_E2E_MODEL=<provider/model-id> OMP_E2E_BUN_DIR=<folder with bun 1.4.4> npm run omp:e2e
 ```
 
 - Without `OMP_E2E=1` the script does nothing and exits 0.
@@ -39,28 +39,39 @@ OMP_E2E=1 OMP_E2E_MODEL=unsloth/inkling-2-mini-unsloth:UD-Q4_K_XL OMP_E2E_BUN_DI
 - A network guard checks every TCP connection of the `omp` process tree every 300 ms. On the first
   connection to a non-loopback address it stops `omp` and fails the run. A run that fails this way
   is not a pass for any scenario.
-- The script never edits the configuration. The default configuration has remote fallback chains,
-  web search and automatic update checks; this is a risk for the maintainer to fix, not something
-  this script changes.
+- The script never edits the configuration. The default configuration of a machine can contain
+  remote fallbacks, web search endpoints and Oh My Pi's automatic update check. These are
+  deliberate choices of the machine owner and the script does not change or disable them.
+  Because the guard stops the run on any non-loopback connection, a default configuration with
+  the update check enabled cannot pass the guard; see "Open decision: the network guard".
 
 The script prints one line per check (`pass`, `fail` or `not-exercised`) and a JSON summary.
 
 ### Last real run
 
-Command: `OMP_E2E=1 OMP_E2E_MODEL=unsloth/inkling-2-mini-unsloth:UD-Q4_K_XL OMP_E2E_BUN_DIR=<folder with bun 1.4.4> npm run omp:e2e`
-(Oh My Pi 19.2.1, the default configuration, the local endpoint at `127.0.0.1:8888`).
+Command: `OMP_E2E=1 OMP_E2E_MODEL=<provider/model-id> OMP_E2E_BUN_DIR=<folder with bun 1.4.4> npm run omp:e2e`
+(Oh My Pi 19.2.1, the default configuration, a local model endpoint).
 
-| Check               | Result       | Duration | What was observed                                                               |
-| ------------------- | ------------ | -------- | ------------------------------------------------------------------------------- |
-| startup             | pass         | 807 ms   | RPC `ready` frame received                                                      |
-| run (scenarios 1-3) | fail (guard) | 0 ms     | `omp` connected to a non-loopback address (`104.26.10.114:443`) before any turn |
+| Check               | Result       | Duration | What was observed                                                    |
+| ------------------- | ------------ | -------- | -------------------------------------------------------------------- |
+| startup             | pass         | 807 ms   | RPC `ready` frame received                                           |
+| run (scenarios 1-3) | fail (guard) | 0 ms     | `omp` connected to a non-loopback address (port 443) before any turn |
 
-Other loopback peers seen: `127.0.0.1:8888` (the model endpoint) and `127.0.0.1:11434`, which was not
-identified. Earlier runs of the same script stopped the same way, on another non-loopback address
-(`172.67.75.165:443`). The cause of the remote connection was not identified: it happens before any
-scenario, and the configuration was not inspected beyond its structure. No scenario was executed, so
-the model answer, delivery, ack, branch response, `working`/`free` status and `abort` remain not
-verified.
+Other loopback peers seen: the model endpoint and one local port that was not identified. Earlier
+runs of the same script stopped the same way, on another non-loopback address (port 443). The
+connection is Oh My Pi's automatic update check, which is enabled on purpose in that configuration
+(information from the maintainer, not observed by the script). It happens before any scenario. No
+scenario was executed, so the model answer, delivery, ack, branch response, `working`/`free` status
+and `abort` remain not verified.
+
+### Open decision: the network guard
+
+The guard was written to protect a machine from unexpected traffic. The update check is expected,
+so with that configuration the guard always stops the run before the first scenario. The options
+for the maintainer are: run the check with an Oh My Pi configuration that has the update check off
+(a separate configuration, not an edit of the default one), or add an explicit, opt-in allowlist
+of expected remote hosts to the script, listed in its output. Neither is implemented yet, because
+it changes what the guard protects against.
 
 ### Scenarios
 
