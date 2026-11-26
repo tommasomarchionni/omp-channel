@@ -17,19 +17,33 @@ function send(message) {
   process.stdout.write(`${JSON.stringify(message)}\n`);
 }
 
-function emitTestMessage() {
+function emitMessage(id, body) {
   send({
     jsonrpc: "2.0",
     method: CHANNEL_METHOD,
     params: {
       type: "message",
       conversationId,
-      messageId,
+      messageId: id,
       sender: "example-user",
-      text,
+      attribution: "agent",
+      text: body,
       sentAt: new Date().toISOString(),
     },
   });
+}
+
+function emitTestMessage() {
+  emitMessage(messageId, text);
+  // Optional second message, for checks of a busy agent (test/omp-e2e). Off unless set.
+  const secondAfter = Number(process.env.EXAMPLE_CHANNEL_SECOND_AFTER_MS ?? "");
+  if (Number.isFinite(secondAfter) && secondAfter > 0) {
+    setTimeout(
+      () =>
+        emitMessage(`${messageId}-2`, "Second example message, sent while the agent may be busy."),
+      secondAfter,
+    );
+  }
 }
 
 const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });

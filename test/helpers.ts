@@ -1,11 +1,15 @@
 import type {
   ExtensionAPI,
   ExtensionContext,
-  LifecycleEvent,
   McpNotificationEvent,
-  SendUserMessageOptions,
   ToolDefinition,
-} from "../src/omp-api.js";
+} from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
+import type { SendUserMessageOptions } from "@oh-my-pi/pi-coding-agent/session/agent-session-types";
+
+/** Lifecycle events used by the fake API. Only the event type is needed. */
+export interface LifecycleEvent {
+  type: "session_start" | "agent_start" | "agent_end" | "session_shutdown";
+}
 
 export interface SentPrompt {
   content: string;
@@ -83,17 +87,24 @@ export function fakePi(sendMode: "accept" | "hold" | "reject" = "accept") {
   };
 }
 
+/** Text of a tool result (the first content item, when it is text). */
+export function resultText(result: { content: { type: string }[] }): string {
+  const first = result.content[0] as { type: string; text?: string } | undefined;
+  return first?.text ?? "";
+}
+
 export function fakeContext(
   overrides: { idle?: boolean; aborts?: { count: number } } = {},
 ): ExtensionContext {
   const aborts = overrides.aborts ?? { count: 0 };
-  return {
+  const context = {
     hasUI: false,
     isIdle: () => overrides.idle ?? true,
     abort: () => {
       aborts.count += 1;
     },
   };
+  return context as unknown as ExtensionContext;
 }
 
 export const flush = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));

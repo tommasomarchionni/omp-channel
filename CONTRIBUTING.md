@@ -37,6 +37,8 @@ commands while you work (`npm test`, `npm run lint`) and the full check before y
 - Unit tests run without network access.
 - The HTTP transport end-to-end test uses a server bound to `127.0.0.1` that simulates a service.
   It never contacts an external host.
+- `npm run omp:e2e` runs real Oh My Pi against a model you choose. It needs `OMP_E2E=1` and
+  `OMP_E2E_MODEL`, so it never runs in CI or by accident. See docs/omp-verification.md.
 - Do not skip or retry tests to make them pass. Fix the cause.
 
 ## Style

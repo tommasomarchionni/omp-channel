@@ -35,7 +35,8 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "test": "node --import tsx --test test/*.test.ts",
-    "check": "npm run typecheck && npm run lint && npm run format:check && npm test"
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm test",
+    "omp:e2e": "node test/omp-e2e/run.mjs"
   },
   "keywords": [
     "oh-my-pi",
@@ -55,6 +56,7 @@
   "author": "The omp-channel contributors",
   "devDependencies": {
     "@biomejs/biome": "^2.6.9",
+    "@oh-my-pi/pi-coding-agent": "19.2.1",
     "@types/node": "^20.19.43",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3"

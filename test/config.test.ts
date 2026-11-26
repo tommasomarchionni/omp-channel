@@ -19,7 +19,7 @@ describe("loadConfig", () => {
     assert.equal(config.mcpServer, "omp-channel");
     assert.equal(config.service, undefined);
     assert.equal(config.adapterModule, undefined);
-    assert.deepEqual(config.delivery, { deliverAs: "followUp", attribution: "agent" });
+    assert.deepEqual(config.delivery, { deliverAs: "followUp" });
     assert.deepEqual(config.limits, { maxTextLength: 4000, maxSenderLength: 64, maxPending: 5 });
     assert.deepEqual(config.poll, { intervalMs: 2000, maxBackoffMs: 30000, batchSize: 10 });
   });

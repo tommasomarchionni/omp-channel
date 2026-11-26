@@ -6,8 +6,9 @@ import type {
   ExtensionAPI,
   ExtensionContext,
   ExtensionFactory,
-} from "./omp-api.js";
+} from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
 import { parseMcpNotification, parseReplyInput } from "./protocol.js";
+import { jsonSchemaParameters } from "./tool-schema.js";
 
 export const REPLY_TOOL_NAME = "reply";
 
@@ -84,7 +85,7 @@ export function createChannelExtension(options: ChannelExtensionOptions): Extens
       label: "Reply to service",
       description:
         "Send a reply to an external message. Pass the messageId shown with that message. Only messageIds received in this session are accepted.",
-      parameters: {
+      parameters: jsonSchemaParameters({
         type: "object",
         properties: {
           messageId: { type: "string", minLength: 1, maxLength: 128 },
@@ -92,7 +93,7 @@ export function createChannelExtension(options: ChannelExtensionOptions): Extens
         },
         required: ["messageId", "text"],
         additionalProperties: false,
-      },
+      }),
       async execute(_toolCallId, params, _signal, _onUpdate, ctx): Promise<AgentToolResult> {
         context = ctx;
         const parsed = parseReplyInput(params, config.limits);

@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import ompChannel from "../src/index.js";
-import { fakePi, flush } from "./helpers.js";
+import { fakePi, flush, resultText } from "./helpers.js";
 
 /** Local stand-in for a service: loopback only, no external host is contacted. */
 function startService(key: string) {
@@ -19,6 +19,7 @@ function startService(key: string) {
         conversationId: "c1",
         messageId: "m1",
         sender: "ann",
+        attribution: "agent",
         text: "Hello agent",
       },
     },
@@ -111,42 +112,44 @@ describe("HTTP transport end to end (loopback service)", () => {
     const pi = fakePi();
     await ompChannel(pi.api);
     pi.lifecycle("session_start");
+    try {
+      await waitFor(() => pi.sent.length === 1, "the message to reach the agent");
+      assert.deepEqual(pi.sent[0]?.options, { deliverAs: "followUp", attribution: "agent" });
+      await waitFor(() => service.acked.includes("d1"), "the acknowledgement");
 
-    await waitFor(() => pi.sent.length === 1, "the message to reach the agent");
-    assert.deepEqual(pi.sent[0]?.options, { deliverAs: "followUp", attribution: "agent" });
-    await waitFor(() => service.acked.includes("d1"), "the acknowledgement");
+      pi.lifecycle("agent_start");
+      const result = await pi
+        .tool("reply")
+        .execute("call-1", { messageId: "m1", text: "Hi there" }, undefined, undefined, {
+          hasUI: false,
+          isIdle: () => true,
+          abort: () => undefined,
+        } as unknown as Parameters<ReturnType<typeof pi.tool>["execute"]>[4]);
+      assert.equal(resultText(result), "Reply sent.");
+      pi.lifecycle("agent_end");
+      await waitFor(() => service.statuses.length === 2, "two status reports");
 
-    pi.lifecycle("agent_start");
-    const result = await pi
-      .tool("reply")
-      .execute("call-1", { messageId: "m1", text: "Hi there" }, undefined, undefined, {
-        hasUI: false,
-        isIdle: () => true,
-        abort: () => undefined,
-      });
-    assert.equal(result.content[0]?.text, "Reply sent.");
-    pi.lifecycle("agent_end");
-    await waitFor(() => service.statuses.length === 2, "two status reports");
-
-    const reply = service.replies[0] as { replyTo: string; text: string; conversationId: string };
-    assert.equal(reply.replyTo, "m1");
-    assert.equal(reply.conversationId, "c1");
-    assert.equal(reply.text, "Hi there");
-    assert.deepEqual(
-      (service.statuses as { status: string }[]).map((item) => item.status),
-      ["working", "free"],
-    );
-    assert.ok(
-      service.requests.every((request) => request.auth === `Bearer ${key}`),
-      "every call carries the key",
-    );
-    assert.equal(JSON.stringify(pi.sent).includes(key), false, "the key never reaches the model");
-
-    const countBefore = service.requests.length;
-    pi.lifecycle("session_shutdown");
-    await flush();
+      const reply = service.replies[0] as { replyTo: string; text: string; conversationId: string };
+      assert.equal(reply.replyTo, "m1");
+      assert.equal(reply.conversationId, "c1");
+      assert.equal(reply.text, "Hi there");
+      assert.deepEqual(
+        (service.statuses as { status: string }[]).map((item) => item.status),
+        ["working", "free"],
+      );
+      assert.ok(
+        service.requests.every((request) => request.auth === `Bearer ${key}`),
+        "every call carries the key",
+      );
+      assert.equal(JSON.stringify(pi.sent).includes(key), false, "the key never reaches the model");
+    } finally {
+      pi.lifecycle("session_shutdown");
+    }
+    const countAtShutdown = service.requests.length;
     await new Promise((resolve) => setTimeout(resolve, 250));
-    const polls = service.requests.slice(countBefore).filter((request) => request.method === "GET");
-    assert.ok(polls.length <= 1, "polling stops after session shutdown");
+    const pollsAfter = service.requests
+      .slice(countAtShutdown)
+      .filter((request) => request.method === "GET");
+    assert.ok(pollsAfter.length <= 1, "polling stops after session shutdown");
   });
 });

@@ -3,7 +3,7 @@ import { ConfigError, type ReadText, loadConfig } from "./config.js";
 import { createChannelExtension } from "./extension.js";
 import { createHttpAdapter } from "./http-adapter.js";
 import { loadAdapterModule } from "./module-adapter.js";
-import type { ExtensionAPI } from "./omp-api.js";
+import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
 
 export { type ChannelAdapter, type Delivery, AdapterError, isChannelAdapter } from "./adapter.js";
 export { type ChannelConfig, ConfigError, loadConfig, parseServiceUrl } from "./config.js";

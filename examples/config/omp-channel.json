@@ -6,7 +6,6 @@
     "keyEnv": "EXAMPLE_CHANNEL_KEY"
   },
   "delivery": {
-    "deliverAs": "followUp",
-    "attribution": "agent"
+    "deliverAs": "followUp"
   }
 }

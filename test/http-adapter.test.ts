@@ -63,6 +63,7 @@ const validEvent = {
   conversationId: "c1",
   messageId: "m1",
   sender: "ann",
+  attribution: "agent",
   text: "hi",
 };
 

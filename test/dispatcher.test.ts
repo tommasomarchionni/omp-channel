@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import type { ChannelAdapter } from "../src/adapter.js";
 import { loadConfig } from "../src/config.js";
 import { Dispatcher, type SessionPort } from "../src/dispatcher.js";
-import type { SendUserMessageOptions } from "../src/omp-api.js";
+import type { SendUserMessageOptions } from "@oh-my-pi/pi-coding-agent/session/agent-session-types";
 import type { InboundEvent, OutboundReply, OutboundStatus } from "../src/protocol.js";
 import { flush } from "./helpers.js";
 
@@ -63,6 +63,7 @@ const message = (
     conversationId,
     messageId,
     sender: "ann",
+    attribution: "agent",
     text: `text ${messageId}`,
     ...extra,
   }) as InboundEvent;

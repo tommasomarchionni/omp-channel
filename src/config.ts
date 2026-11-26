@@ -30,7 +30,6 @@ export interface PollConfig {
 
 export interface DeliveryConfig {
   readonly deliverAs: "steer" | "followUp" | "aside";
-  readonly attribution: "user" | "agent";
 }
 
 export interface ChannelConfig {
@@ -89,10 +88,7 @@ export function loadConfig(sources: ConfigSources): ChannelConfig {
     adapterModule?: string;
     poll: { intervalMs: number; maxBackoffMs: number; batchSize: number };
     limits: { maxTextLength: number; maxSenderLength: number; maxPending: number };
-    delivery: {
-      deliverAs: DeliveryConfig["deliverAs"];
-      attribution: DeliveryConfig["attribution"];
-    };
+    delivery: { deliverAs: DeliveryConfig["deliverAs"] };
   };
 
   const service = parsed.service === undefined ? undefined : loadService(parsed.service, sources);

@@ -6,7 +6,9 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "$schema": { "type": "string" },
+    "$schema": {
+      "type": "string"
+    },
     "mcpServer": {
       "description": "Name of the MCP server (as in the Oh My Pi MCP configuration) that may push messages.",
       "type": "string",
@@ -41,10 +43,26 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "messages": { "type": "string", "pattern": "^/", "default": "/messages" },
-            "ack": { "type": "string", "pattern": "^/", "default": "/messages/ack" },
-            "replies": { "type": "string", "pattern": "^/", "default": "/replies" },
-            "status": { "type": "string", "pattern": "^/", "default": "/status" }
+            "messages": {
+              "type": "string",
+              "pattern": "^/",
+              "default": "/messages"
+            },
+            "ack": {
+              "type": "string",
+              "pattern": "^/",
+              "default": "/messages/ack"
+            },
+            "replies": {
+              "type": "string",
+              "pattern": "^/",
+              "default": "/replies"
+            },
+            "status": {
+              "type": "string",
+              "pattern": "^/",
+              "default": "/status"
+            }
           },
           "default": {}
         }
@@ -54,9 +72,24 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "intervalMs": { "type": "integer", "minimum": 100, "maximum": 60000, "default": 2000 },
-        "maxBackoffMs": { "type": "integer", "minimum": 100, "maximum": 300000, "default": 30000 },
-        "batchSize": { "type": "integer", "minimum": 1, "maximum": 100, "default": 10 }
+        "intervalMs": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 60000,
+          "default": 2000
+        },
+        "maxBackoffMs": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 300000,
+          "default": 30000
+        },
+        "batchSize": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 10
+        }
       },
       "default": {}
     },
@@ -64,9 +97,24 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "maxTextLength": { "type": "integer", "minimum": 1, "maximum": 20000, "default": 4000 },
-        "maxSenderLength": { "type": "integer", "minimum": 1, "maximum": 256, "default": 64 },
-        "maxPending": { "type": "integer", "minimum": 1, "maximum": 100, "default": 5 }
+        "maxTextLength": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20000,
+          "default": 4000
+        },
+        "maxSenderLength": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256,
+          "default": 64
+        },
+        "maxPending": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 5
+        }
       },
       "default": {}
     },
@@ -79,12 +127,6 @@
           "type": "string",
           "enum": ["steer", "followUp", "aside"],
           "default": "followUp"
-        },
-        "attribution": {
-          "description": "Default attribution of an incoming message when the service does not set one.",
-          "type": "string",
-          "enum": ["user", "agent"],
-          "default": "agent"
         }
       },
       "default": {}

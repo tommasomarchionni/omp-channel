@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { AdapterError, type ChannelAdapter } from "./adapter.js";
 import type { ChannelConfig } from "./config.js";
-import type { SendUserMessageOptions } from "./omp-api.js";
+import type { SendUserMessageOptions } from "@oh-my-pi/pi-coding-agent/session/agent-session-types";
 import {
   type AgentStatus,
   buildReply,
@@ -169,7 +169,7 @@ export class Dispatcher {
     }
     const options: SendUserMessageOptions = {
       deliverAs: config.delivery.deliverAs,
-      attribution: event.attribution ?? config.delivery.attribution,
+      attribution: event.attribution,
     };
     try {
       await this.#options.session.send(formatForSession(event), options);

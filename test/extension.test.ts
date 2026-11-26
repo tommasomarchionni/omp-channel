@@ -4,7 +4,7 @@ import type { ChannelAdapter, Delivery } from "../src/adapter.js";
 import { loadConfig } from "../src/config.js";
 import { createChannelExtension, REPLY_TOOL_NAME } from "../src/extension.js";
 import type { OutboundReply, OutboundStatus } from "../src/protocol.js";
-import { fakeContext, fakePi, flush } from "./helpers.js";
+import { fakeContext, fakePi, flush, resultText } from "./helpers.js";
 
 const config = loadConfig({ env: {}, cwd: "/", readText: () => undefined });
 
@@ -12,7 +12,14 @@ const messageEvent = (messageId: string, conversationId = "c1") => ({
   type: "mcp_notification" as const,
   server: "omp-channel",
   method: "notifications/omp/channel",
-  params: { type: "message", conversationId, messageId, sender: "ann", text: `text ${messageId}` },
+  params: {
+    type: "message",
+    conversationId,
+    messageId,
+    sender: "ann",
+    attribution: "agent",
+    text: `text ${messageId}`,
+  },
 });
 
 interface TestAdapter extends ChannelAdapter {
@@ -57,6 +64,7 @@ const delivery = (deliveryId: string, messageId: string): Delivery => ({
     conversationId: "c1",
     messageId,
     sender: "ann",
+    attribution: "agent",
     text: `text ${messageId}`,
   },
 });
@@ -79,7 +87,14 @@ describe("MCP push path", () => {
     pi.notify({ ...messageEvent("m1"), server: "other" });
     pi.notify({
       ...messageEvent("m2"),
-      params: { type: "message", conversationId: "c1", messageId: "m2", sender: "a", text: "" },
+      params: {
+        type: "message",
+        conversationId: "c1",
+        messageId: "m2",
+        sender: "a",
+        attribution: "agent",
+        text: "",
+      },
     });
     await flush();
     assert.equal(pi.sent.length, 0);
@@ -108,8 +123,12 @@ describe("reply tool", () => {
     const pi = fakePi();
     createChannelExtension({ config })(pi.api);
     const tool = pi.tool(REPLY_TOOL_NAME);
-    assert.deepEqual(tool.parameters.required, ["messageId", "text"]);
-    assert.equal(tool.parameters.additionalProperties, false);
+    const schema = tool.parameters as unknown as {
+      required: string[];
+      additionalProperties: boolean;
+    };
+    assert.deepEqual(schema.required, ["messageId", "text"]);
+    assert.equal(schema.additionalProperties, false);
   });
 
   it("refuses a messageId that was not delivered in this session", async () => {
@@ -118,7 +137,7 @@ describe("reply tool", () => {
     const result = await pi
       .tool(REPLY_TOOL_NAME)
       .execute("t1", { messageId: "x", text: "y" }, undefined, undefined, fakeContext());
-    assert.equal(result.content[0]?.text, "Reply not sent: unknown messageId.");
+    assert.equal(resultText(result), "Reply not sent: unknown messageId.");
   });
 
   it("rejects invalid arguments before doing anything", async () => {
@@ -127,7 +146,7 @@ describe("reply tool", () => {
     const result = await pi
       .tool(REPLY_TOOL_NAME)
       .execute("t2", { messageId: "x", text: "" }, undefined, undefined, fakeContext());
-    assert.match(result.content[0]?.text ?? "", /^Reply rejected: text must be/);
+    assert.match(resultText(result), /^Reply rejected: text must be/);
   });
 
   it("posts the reply through the adapter, bound to the messageId", async () => {
@@ -141,7 +160,7 @@ describe("reply tool", () => {
       .tool(REPLY_TOOL_NAME)
       .execute("t3", { messageId: "m1", text: "answer" }, undefined, undefined, fakeContext());
     stop.abort();
-    assert.equal(result.content[0]?.text, "Reply sent.");
+    assert.equal(resultText(result), "Reply sent.");
     assert.equal(adapter.replies[0]?.replyTo, "m1");
     assert.equal(adapter.replies[0]?.text, "answer");
   });
@@ -154,7 +173,7 @@ describe("reply tool", () => {
     const result = await pi
       .tool(REPLY_TOOL_NAME)
       .execute("t4", { messageId: "m1", text: "x" }, undefined, undefined, fakeContext());
-    assert.equal(result.content[0]?.text, "Reply not sent: replies are not configured.");
+    assert.equal(resultText(result), "Reply not sent: replies are not configured.");
   });
 });
 
@@ -174,7 +193,14 @@ describe("adapter receive loop", () => {
     const pi = fakePi();
     const other: Delivery = {
       deliveryId: "d2",
-      event: { type: "message", conversationId: "c2", messageId: "m2", sender: "a", text: "t" },
+      event: {
+        type: "message",
+        conversationId: "c2",
+        messageId: "m2",
+        sender: "a",
+        attribution: "agent",
+        text: "t",
+      },
     };
     const adapter = scriptedAdapter([delivery("d1", "m1"), other]);
     createChannelExtension({ config, adapter })(pi.api);

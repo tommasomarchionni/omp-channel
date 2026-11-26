@@ -1,7 +1,7 @@
 # Integration protocol (version 1)
 
-This document is the public contract between an external **service** (a chat, a console, a
-ticket queue, any system that exchanges messages with a person or another agent) and an agent
+This document is the public contract between an external **service** (any system that exchanges
+messages with a person or with another agent) and an agent
 session of [Oh My Pi](https://github.com/can1357/oh-my-pi) running omp-channel. Any service can
 implement it. The contract is independent of any product.
 
@@ -59,7 +59,21 @@ are the defaults.
 | `text`           | yes      | string, 1 to 4000 characters, no control characters except tab and line feed | The content.                                                                             |
 | `sentAt`         | no       | ISO 8601 timestamp                                                           | Set by the service. Informational.                                                       |
 | `replyTo`        | no       | identifier                                                                   | `messageId` of an earlier message this one answers. Informational.                       |
-| `attribution`    | no       | `"user"` or `"agent"`                                                        | Who wrote the message. Default: `delivery.attribution` in the configuration (`"agent"`). |
+| `attribution`    | yes      | `"user"` or `"agent"`                                                        | Who wrote the message. Passed to Oh My Pi unchanged. See section 3.4 for the open point. |
+
+### 3.4 Open point: `attribution` values
+
+`attribution` is required, and omp-channel sets no default for it. The value is handed to Oh My Pi
+as the `attribution` option of `sendUserMessage`. What Oh My Pi does with each value (for
+example whether it changes how the turn is billed or which initiator it records) is **not verified**.
+
+Until it is verified, a service must set `attribution` to the value that describes who wrote the
+message: `"user"` for a person, `"agent"` for another agent. omp-channel does not choose a value on
+its behalf.
+
+How to verify: run the end-to-end script in `test/omp-e2e/` once with each value, then compare the
+recorded initiator of the turn in the Oh My Pi session output. The result is recorded in
+`docs/omp-verification.md`. Only then may a default be documented.
 
 ### 3.2 `interrupt`
 
@@ -246,6 +260,6 @@ new version number.
 ## 12. Not in this contract
 
 - Delivery of messages from the agent to a person without a reply to a message.
-- Attachments, images and voice.
+- Attachments and other non-text content.
 - Multiple concurrent conversations in one agent session.
 - Authentication schemes other than a bearer key. Use an adapter module for anything else.

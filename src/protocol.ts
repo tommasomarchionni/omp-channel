@@ -33,7 +33,11 @@ export interface MessageEvent {
   readonly sentAt?: string;
   /** messageId of an earlier message this one answers, when the service sets it. */
   readonly replyTo?: string;
-  readonly attribution?: Attribution;
+  /**
+   * Who wrote the message. Required: the value is passed to Oh My Pi unchanged. Which value
+   * Oh My Pi needs for each kind of message is an open point (docs/protocol.md, section 3.1).
+   */
+  readonly attribution: Attribution;
 }
 
 /** Stops the agent's current turn. Tool results already produced are kept. */
@@ -150,8 +154,8 @@ function parseMessage(raw: Record<string, unknown>, limits: Limits): ParseResult
     }
     replyTo = parsed.value;
   }
-  if (raw.attribution !== undefined && raw.attribution !== "user" && raw.attribution !== "agent") {
-    return fail('attribution must be "user" or "agent" when present');
+  if (raw.attribution !== "user" && raw.attribution !== "agent") {
+    return fail('attribution must be "user" or "agent"');
   }
   const value: MessageEvent = {
     type: "message",
@@ -161,7 +165,7 @@ function parseMessage(raw: Record<string, unknown>, limits: Limits): ParseResult
     text: text.value,
     ...(typeof raw.sentAt === "string" ? { sentAt: raw.sentAt } : {}),
     ...(replyTo === undefined ? {} : { replyTo }),
-    ...(raw.attribution === undefined ? {} : { attribution: raw.attribution }),
+    attribution: raw.attribution,
   };
   return { ok: true, value };
 }
@@ -182,9 +186,12 @@ export function parseMcpNotification(
 }
 
 export function parseReplyInput(
-  raw: Record<string, unknown>,
+  raw: unknown,
   limits: Limits = DEFAULT_LIMITS,
 ): ParseResult<{ messageId: string; text: string }> {
+  if (!isRecord(raw)) {
+    return fail("reply must be an object");
+  }
   const messageId = parseId(raw.messageId, "messageId");
   if (!messageId.ok) {
     return messageId;

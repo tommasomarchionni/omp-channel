@@ -1,8 +1,8 @@
 # omp-channel
 
 **omp-channel** is an extension for [Oh My Pi](https://github.com/can1357/oh-my-pi) (OMP), a
-terminal agent harness. It delivers messages from an external service (a chat, a console, or any
-system that exchanges messages with a person) into an agent session, and sends the agent's replies
+terminal agent harness. It delivers messages from an external service (any system that exchanges messages
+with a person) into an agent session, and sends the agent's replies
 back to that service.
 
 It is for people who run an agent in a terminal and want an outside service to be able to send
@@ -10,10 +10,10 @@ it work and receive the answers, including while the agent is busy. It is **not*
 service, it contains **no models**, and it does **not** manage accounts. You provide the service
 and the model; omp-channel is the link between them.
 
-> **Status: alpha.** The behaviour is covered by automated tests that use fakes and a loopback
-> HTTP service. It has **not yet been run inside a live Oh My Pi session**. Oh My Pi's extension
-> types are reproduced in `src/omp-api.d.ts` and must be re-checked when Oh My Pi changes (see
-> [Compatibility](#compatibility)).
+> **Status: alpha, not published.** The behaviour is covered by automated tests that use fakes and
+> a loopback HTTP service. Oh My Pi starts and loads the extension, but delivery, turns, queueing
+> and abort are **not yet verified in a live session**. See
+> [docs/omp-verification.md](docs/omp-verification.md) for each check and what is open.
 
 ## Contents
 
@@ -100,8 +100,7 @@ your own. It also includes a local MCP test message that needs no service.
     "keyEnv": "EXAMPLE_CHANNEL_KEY"
   },
   "delivery": {
-    "deliverAs": "followUp",
-    "attribution": "agent"
+    "deliverAs": "followUp"
   }
 }
 ```
@@ -164,6 +163,10 @@ The name `omp-channel` must equal `mcpServer` in the configuration file.
 
 ## Configuration
 
+Every message the service sends must carry `attribution` (`"user"` or `"agent"`). That value is
+passed to Oh My Pi unchanged, and which value fits which message is an open point; see
+[docs/protocol.md](docs/protocol.md), section 3.4.
+
 The configuration file is read from `OMP_CHANNEL_CONFIG`, or from `.omp/omp-channel.json` in the
 working directory when it exists. Without a file the defaults apply and nothing is connected: the
 extension still receives MCP pushes, but replies are reported as not configured. The file is
@@ -184,7 +187,6 @@ the extension and writes the reason (with its path) to stderr.
 | `limits.maxSenderLength`   | `64`                                                | Longest sender name.                                                                            |
 | `limits.maxPending`        | `5`                                                 | Events waiting to be admitted; more are dropped and not acknowledged.                           |
 | `delivery.deliverAs`       | `"followUp"`                                        | How a message is queued in Oh My Pi: `steer`, `followUp` or `aside`.                            |
-| `delivery.attribution`     | `"agent"`                                           | Attribution of a message when the service does not set one: `user` or `agent`.                  |
 | `adapterModule`            | none                                                | Path to a module that exports a `ChannelAdapter`. Replaces the HTTP transport.                  |
 
 Environment variables:
@@ -214,13 +216,13 @@ Report vulnerabilities privately, as described in [SECURITY.md](SECURITY.md).
 ## Compatibility
 
 - **Node.js:** 20 or later (22 is used in CI; see `.nvmrc`).
-- **Oh My Pi:** the extension API is reproduced in `src/omp-api.d.ts`, from Oh My Pi at commit
-  `eded751bee10cedac1df7ace6616b8d2cf121a8a` and checked against the declarations published in
-  `@oh-my-pi/pi-coding-agent@19.2.1`. Those declarations are the reference. **Re-check
-  `src/omp-api.d.ts` against the Oh My Pi version you run.** The published package is not a
-  dependency of this project, because it is a complete agent with a large dependency tree.
-- **Not verified yet:** a run inside Oh My Pi (loading, `mcp_notification` delivery for stdio
-  servers, interrupt behaviour during a running turn, the tool-parameter schema format).
+- **Oh My Pi:** the extension types come from the exact devDependency
+  `@oh-my-pi/pi-coding-agent@19.2.1`. Oh My Pi runs on **Bun 1.4.4 or later**. The types are
+  imported directly, not copied. One gap is documented in `src/tool-schema.ts`: the tool
+  parameters are plain JSON Schema where Oh My Pi declares a TypeBox schema.
+- **Not verified yet:** delivery of pushed messages to a running session, queueing during a turn,
+  abort, and the effect of each `attribution` value. See [docs/omp-verification.md](docs/omp-verification.md).
+- **Installing:** `npm ci` also installs the Oh My Pi package for type checking; it is large.
 
 ## Development
 
@@ -228,6 +230,7 @@ Report vulnerabilities privately, as described in [SECURITY.md](SECURITY.md).
 npm ci
 npm run check          # typecheck, lint, format check and tests
 npm run build          # compile to dist/
+OMP_E2E=1 OMP_E2E_MODEL=<provider/model> npm run omp:e2e   # real Oh My Pi check, runs a model
 ```
 
 Single commands: `npm run typecheck`, `npm run lint`, `npm run format` (writes), `npm run
