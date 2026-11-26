@@ -46,6 +46,14 @@ function emitTestMessage() {
   }
 }
 
+// One tool, so that Oh My Pi keeps the server connected: a server without tools is closed when
+// idle, before a push can arrive (see docs/omp-verification.md).
+const STATUS_TOOL = {
+  name: "example_status",
+  description: "Reports that the example service is reachable. It has no side effects.",
+  inputSchema: { type: "object", properties: {}, additionalProperties: false },
+};
+
 const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
 
 lines.on("line", (line) => {
@@ -63,7 +71,7 @@ lines.on("line", (line) => {
       id,
       result: {
         protocolVersion: PROTOCOL_VERSION,
-        capabilities: {},
+        capabilities: { tools: {} },
         serverInfo: { name: "example-service-mcp", version: "0.1.0" },
       },
     });
@@ -78,7 +86,15 @@ lines.on("line", (line) => {
     return;
   }
   if (method === "tools/list") {
-    send({ jsonrpc: "2.0", id, result: { tools: [] } });
+    send({ jsonrpc: "2.0", id, result: { tools: [STATUS_TOOL] } });
+    return;
+  }
+  if (method === "tools/call") {
+    send({
+      jsonrpc: "2.0",
+      id,
+      result: { content: [{ type: "text", text: "ok" }], isError: false },
+    });
     return;
   }
   // Notifications without an id are ignored. Requests for unknown methods get an error.

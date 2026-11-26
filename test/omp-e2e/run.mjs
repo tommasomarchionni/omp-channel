@@ -22,8 +22,8 @@
 
 import { execFile, spawn } from "node:child_process";
 import { resolve4 } from "node:dns/promises";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -79,6 +79,21 @@ writeFileSync(
   JSON.stringify({ mcpServer: "omp-channel", delivery: { deliverAs: "followUp" } }),
 );
 
+// A fresh home for each run. Oh My Pi caches the tool list of an MCP server in its home for 30 days,
+// so a home used before can keep an older description of the server and never start it. The local
+// provider file is linked, not copied, so its secrets are not duplicated; the home is removed at the
+// end. Only this check's home is used: the machine's own configuration and cache are not touched.
+const home = mkdtempSync(join(tmpdir(), "omp-channel-e2e-home-"));
+const agentDir = join(home, ".omp", "agent");
+mkdirSync(agentDir, { recursive: true });
+const machineModels = join(homedir(), ".omp", "agent", "models.yml");
+if (!existsSync(machineModels)) fail("the machine has no models.yml with the local provider");
+symlinkSync(machineModels, join(agentDir, "models.yml"));
+writeFileSync(
+  join(agentDir, "config.yml"),
+  "update:\n  auto: false\ntelemetry:\n  otlpExportEnabled: false\nweb_search:\n  enabled: false\n",
+);
+
 // Optional overlay for this run only. Oh My Pi merges it over the machine's configuration; this
 // script never writes it.
 const overlay = env.OMP_E2E_CONFIG;
@@ -110,6 +125,7 @@ const child = spawn(
     env: {
       ...env,
       PATH: env.OMP_E2E_BUN_DIR ? `${env.OMP_E2E_BUN_DIR}:${env.PATH ?? ""}` : env.PATH,
+      HOME: home,
       OMP_CHANNEL_CONFIG: channelConfig,
       EXAMPLE_CHANNEL_SECOND_AFTER_MS: env.OMP_E2E_SECOND_AFTER_MS ?? "1500",
     },
@@ -449,6 +465,7 @@ try {
   child.kill("SIGTERM");
   await sleep(500);
   rmSync(project, { recursive: true, force: true });
+  rmSync(home, { recursive: true, force: true });
 }
 
 const failed = results.filter((item) => item.status === "fail");

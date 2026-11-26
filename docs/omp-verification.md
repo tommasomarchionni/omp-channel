@@ -71,6 +71,18 @@ status and `abort` remain not verified.
 A single prompt turn with the local model completed in about 100 seconds, so a slow answer is not
 the cause of the failures.
 
+### Run with the tool-declaring server and a fresh home (26/11/2026)
+
+The example server now declares one tool (`example_status`) and the `tools` capability. In a fresh
+home, the server stayed connected for more than 30 seconds, and the push started a turn (`agent_start`
+and `agent_end`) in a manual probe. The check now uses a new home for each run and links the
+machine's `models.yml`, so the cached tool list of the machine is not used.
+
+The check reached the model and stopped there: the provider answered `401 Invalid token payload`.
+The model's credentials are not in `models.yml`, and the fresh home does not have them. Reading the
+machine's credential store to copy them was refused by the permission check, so this was not
+resolved. No scenario has run.
+
 ### Latest run with the guard off (26/11/2026)
 
 With `OMP_E2E_NETWORK_GUARD` unset (guard off), the startup passed with the extension loaded. The
