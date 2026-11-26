@@ -295,7 +295,18 @@ async function scenarios() {
     "the RPC ready frame",
     60_000,
   );
-  record("startup", "pass", "RPC ready", Date.now() - started);
+  // The extension reports on stderr when it disables itself (see src/index.ts). Without it the
+  // pushes would be ignored, so the check stops here and says why. stderr may arrive a moment
+  // after the ready frame, so it is read after a short pause.
+  await sleep(1000);
+  const disabledLine = stderr
+    .split("\n")
+    .find((line) => line.startsWith("[omp-channel] disabled:"));
+  if (disabledLine !== undefined) {
+    record("startup", "fail", disabledLine, Date.now() - started);
+    throw new Error(`the extension disabled itself: ${disabledLine}`);
+  }
+  record("startup", "pass", "RPC ready, extension loaded", Date.now() - started);
 
   // 1. Idle agent: the first push starts a turn that must be answered.
   started = Date.now();

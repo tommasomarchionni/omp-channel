@@ -10,18 +10,18 @@ Oh My Pi needs **Bun 1.4.4 or later** at runtime. On 26/11/2026 the system Bun w
 
 ## Status
 
-| Check                                                            | Status       | How it was checked                                                                      |
-| ---------------------------------------------------------------- | ------------ | --------------------------------------------------------------------------------------- |
-| Oh My Pi starts in RPC mode with `-e dist/index.js`              | verified     | RPC `ready` frame received                                                              |
-| The extension loads and runs with a valid configuration          | not verified | the check does not capture the extension's stderr yet; see "Last real run"              |
-| MCP server connects and `mcp_notification` reaches the extension | not verified | the run stopped before any turn; see "Last real run"                                    |
-| First push starts a turn on an idle agent                        | not verified | scenario 1: not reached                                                                 |
-| Push during a running turn is queued as follow-up (not steer)    | not verified | scenario 2: not reached                                                                 |
-| `attribution` values (`user`, `agent`): the example uses `user`  | decided      | the value is a contract choice; its effect in Oh My Pi is open, see "Attribution" below |
-| Effect of `attribution` in Oh My Pi                              | not verified | needs a run with each value; see "Attribution" below                                    |
-| `abort` stops the turn and keeps tool results                    | not verified | scenario 3: not reached                                                                 |
-| Agent status (`working`/`free`) reported to a service            | not verified | needs a service; not part of the script                                                 |
-| Plain JSON Schema tool parameters accepted by Oh My Pi           | not verified | see "Tool parameter schema" below                                                       |
+| Check                                                            | Status       | How it was checked                                                                                                                         |
+| ---------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Oh My Pi starts in RPC mode with `-e dist/index.js`              | verified     | RPC `ready` frame received                                                                                                                 |
+| The extension loads and runs with a valid configuration          | not verified | the check stops at startup if the extension disables itself (tested with a stand-in `omp`); a real load is not yet confirmed in a real run |
+| MCP server connects and `mcp_notification` reaches the extension | not verified | the run stopped before any turn; see "Last real run"                                                                                       |
+| First push starts a turn on an idle agent                        | not verified | scenario 1: not reached                                                                                                                    |
+| Push during a running turn is queued as follow-up (not steer)    | not verified | scenario 2: not reached                                                                                                                    |
+| `attribution` values (`user`, `agent`): the example uses `user`  | decided      | the value is a contract choice; its effect in Oh My Pi is open, see "Attribution" below                                                    |
+| Effect of `attribution` in Oh My Pi                              | not verified | needs a run with each value; see "Attribution" below                                                                                       |
+| `abort` stops the turn and keeps tool results                    | not verified | scenario 3: not reached                                                                                                                    |
+| Agent status (`working`/`free`) reported to a service            | not verified | needs a service; not part of the script                                                                                                    |
+| Plain JSON Schema tool parameters accepted by Oh My Pi           | not verified | see "Tool parameter schema" below                                                                                                          |
 
 ## How to run the check
 
