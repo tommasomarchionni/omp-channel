@@ -21,6 +21,7 @@
 // non-loopback peer.
 
 import { execFile, spawn } from "node:child_process";
+import { resolve4 } from "node:dns/promises";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -117,6 +118,25 @@ const child = spawn(
 );
 
 // ---- network guard ------------------------------------------------------------------------------
+// Remote hosts the check tolerates on purpose. The guard sees addresses, not names, so each host is
+// resolved once before the run and its addresses are allowed for the whole run. An address can be
+// shared with other sites behind the same CDN, so an entry also admits those; keep the list short.
+const TOLERATED_HOSTS = [
+  {
+    host: "catalog.stencil.so",
+    reason:
+      "seen once at startup on 26/11/2026; purpose not documented; Stencil Labs is the author of @oh-my-pi/pi-catalog",
+  },
+];
+const toleratedAddresses = new Map();
+const toleratedSeen = new Set();
+for (const { host, reason } of TOLERATED_HOSTS) {
+  const addresses = await resolve4(host).catch(() => []);
+  if (addresses.length === 0) fail(`tolerated host ${host} does not resolve; the check stops`);
+  for (const address of addresses) toleratedAddresses.set(address, host);
+  console.log(`tolerated remote host: ${host} -> ${addresses.join(", ")} (${reason})`);
+}
+
 let violation = "";
 const peersSeen = new Set();
 const run = (file, args) =>
@@ -151,7 +171,12 @@ async function checkNetwork() {
     const remote = line.split("->")[1] ?? "";
     const host = remote.slice(0, remote.lastIndexOf(":"));
     peersSeen.add(remote);
-    if (!isLoopbackHost(host) && violation === "") {
+    if (isLoopbackHost(host)) continue;
+    if (toleratedAddresses.has(host)) {
+      toleratedSeen.add(`${toleratedAddresses.get(host)} ${remote}`);
+      continue;
+    }
+    if (violation === "") {
       violation = `connection to a non-local host: ${host}`;
       child.kill("SIGTERM");
     }
@@ -384,7 +409,17 @@ try {
 const failed = results.filter((item) => item.status === "fail");
 console.log(
   JSON.stringify(
-    { model, localUrl: localUrl.origin, loopbackPeersSeen: [...peersSeen].sort(), results },
+    {
+      model,
+      localUrl: localUrl.origin,
+      peersSeen: [...peersSeen].sort(),
+      toleratedHosts: TOLERATED_HOSTS.map(({ host }) => ({
+        host,
+        addresses: [...toleratedAddresses].filter(([, name]) => name === host).map(([a]) => a),
+      })),
+      toleratedSeen: [...toleratedSeen].sort(),
+      results,
+    },
     null,
     2,
   ),

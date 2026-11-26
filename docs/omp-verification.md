@@ -45,7 +45,9 @@ OMP_E2E=1 OMP_E2E_MODEL=<provider/model-id> npm run omp:e2e
   configuration underneath it, so the providers stay the same. The script never writes it.
 - A network guard checks every TCP connection of the `omp` process tree every 300 ms. On the first
   connection to a non-loopback address it stops `omp` and fails the run. A run that fails this way
-  is not a pass for any scenario.
+  is not a pass for any scenario. The only exception is `TOLERATED_HOSTS` in the script: one host,
+  `catalog.stencil.so`, resolved before the run and printed at its start, with its reason. Its
+  addresses are shared behind a CDN, so the exception also admits other sites on those addresses.
 - The machine's configuration is not edited. It keeps its remote fallbacks, web search endpoints,
   the spotlight service and the automatic update check, which are deliberate choices of the machine
   owner. The run adds `--no-spotlight` because the spotlight service (`spotlight.url`) was seen
@@ -64,10 +66,29 @@ Command: `OMP_E2E=1 OMP_E2E_MODEL=unsloth/inkling-2-mini-unsloth:UD-Q4_K_XL npm 
 | run (scenarios 1-3) | fail (guard) | 0 ms     | `omp` connected to `172.67.75.165:443` before any scenario |
 
 No scenario was executed, so the model answer, delivery, ack, branch response, `working`/`free`
-status and `abort` remain not verified. Earlier runs stopped the same way on `104.26.10.114:443`.
+status and `abort` remain not verified.
 
 A single prompt turn with the local model completed in about 100 seconds, so a slow answer is not
 the cause of the failures.
+
+### Status: blocked by the network guard (26/11/2026)
+
+The check cannot pass on this machine as configured. At startup, before any scenario, `omp`
+opens connections to many remote addresses, and the set changes between runs. Seen across runs:
+
+- `catalog.stencil.so` (tolerated on purpose; its addresses are `104.26.10.114`, `104.26.11.114`,
+  `172.67.75.165`).
+- Not tolerated, and the guard stops on the first one: `140.82.113.22` (GitHub), `142.251.141.243`
+  (Google), `54.230.183.54` (AWS), `43.106.123.215`, `43.98.246.135`, `64.239.123.65`,
+  `104.18.10.160`, `104.18.28.226`, `104.26.8.108`.
+
+Two checks did not change the result. A home folder with a minimal configuration (updates,
+telemetry, web search and fallbacks off) still shows the same kind of connections, so they do not
+come from the user's configuration. The tolerated list is per address, and the addresses are shared
+behind CDNs, so it cannot be made complete by adding entries one run at a time.
+
+To run the scenarios, the network must be restricted at the operating-system level (for example
+with firewall rules or a sandbox), which needs privileges and the maintainer's authorization.
 
 ### Source of the remote connections
 
