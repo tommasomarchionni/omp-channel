@@ -11,6 +11,7 @@
     "schema",
     "docs/protocol.md",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE",
     "NOTICE"
   ],
@@ -18,7 +19,8 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "omp": {
     "extensions": [
@@ -36,14 +38,19 @@
     "format:check": "biome format .",
     "test": "node --import tsx --test test/*.test.ts",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm test",
-    "omp:e2e": "node test/omp-e2e/run.mjs"
+    "omp:e2e": "node test/omp-e2e/run.mjs",
+    "prepack": "npm run build",
+    "pack:check": "npm pack --dry-run"
   },
   "keywords": [
     "oh-my-pi",
     "omp",
     "extension",
+    "coding-agent",
+    "agent",
+    "channel",
     "mcp",
-    "agent"
+    "messaging"
   ],
   "repository": {
     "type": "git",
@@ -63,5 +70,9 @@
   },
   "dependencies": {
     "ajv": "^8.20.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }
