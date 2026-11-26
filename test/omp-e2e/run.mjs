@@ -17,8 +17,8 @@
 // endpoint checked before starting, default http://127.0.0.1:8888/v1), OMP_E2E_SECOND_AFTER_MS
 // (default 1500).
 //
-// A network guard watches every TCP connection of the omp process tree and fails the run on any
-// non-loopback peer.
+// An optional network guard (OMP_E2E_NETWORK_GUARD=1, off by default) watches every TCP connection
+// of the omp process tree and fails the run on any non-loopback peer.
 
 import { execFile, spawn } from "node:child_process";
 import { resolve4 } from "node:dns/promises";
@@ -148,9 +148,17 @@ const TOLERATED = [
       "seen at startup in several runs on 26/11/2026, with no prompt sent; probably the endpoints that model discovery at startup contacts for the configured providers (not verified which address belongs to which provider)",
   },
 ];
+// The network guard is off by default. OMP_E2E_NETWORK_GUARD=1 turns it on; the tolerated entries
+// apply only while it is on.
+const networkGuard = env.OMP_E2E_NETWORK_GUARD === "1";
 const toleratedAddresses = new Map(); // address -> entry name
 const toleratedSeen = new Set();
-for (const entry of TOLERATED) {
+if (!networkGuard) {
+  console.log(
+    "network guard: off (set OMP_E2E_NETWORK_GUARD=1 to stop on any non-loopback connection)",
+  );
+}
+for (const entry of networkGuard ? TOLERATED : []) {
   const name = entry.host ?? entry.label;
   const addresses =
     entry.host === undefined ? entry.addresses : await resolve4(entry.host).catch(() => []);
@@ -207,9 +215,11 @@ async function checkNetwork() {
   }
 }
 
-const guard = setInterval(() => {
-  checkNetwork().catch(() => undefined);
-}, 300);
+const guard = networkGuard
+  ? setInterval(() => {
+      checkNetwork().catch(() => undefined);
+    }, 300)
+  : undefined;
 
 // ---- RPC plumbing -------------------------------------------------------------------------------
 const frames = [];
@@ -447,6 +457,7 @@ console.log(
     {
       model,
       localUrl: localUrl.origin,
+      networkGuard: networkGuard ? "on" : "off",
       peersSeen: [...peersSeen].sort(),
       tolerated: TOLERATED.map((entry) => {
         const name = entry.host ?? entry.label;

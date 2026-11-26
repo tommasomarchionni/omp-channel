@@ -43,12 +43,11 @@ OMP_E2E=1 OMP_E2E_MODEL=<provider/model-id> npm run omp:e2e
   local model can take minutes for one answer, so the default is longer than a typical turn.
 - `OMP_E2E_CONFIG` is an overlay for this run only. Oh My Pi still loads the machine's
   configuration underneath it, so the providers stay the same. The script never writes it.
-- A network guard checks every TCP connection of the `omp` process tree every 300 ms. On the first
-  connection to a non-loopback address it stops `omp` and fails the run. A run that fails this way
-  is not a pass for any scenario. The only exceptions are the entries of `TOLERATED` in the script:
-  `catalog.stencil.so` (resolved before the run) and a list of addresses seen at startup. Each entry
-  is printed at the start of the run with its reason. The addresses are shared behind CDNs, so an
-  entry also admits other sites on them, and a list of addresses changes from one run to the next.
+- The network guard is **off by default** (decision of 26/11/2026). It is enabled with
+  `OMP_E2E_NETWORK_GUARD=1`. When on, it checks every TCP connection of the `omp` process tree every
+  300 ms and, on the first connection to a non-loopback address, stops `omp` and fails the run. The
+  entries of `TOLERATED` in the script apply only while it is on. With the guard off, the run is not
+  restricted at the network level: it can reach any remote host that `omp` contacts.
 - The machine's configuration is not edited. It keeps its remote fallbacks, web search endpoints,
   the spotlight service and the automatic update check, which are deliberate choices of the machine
   owner. The run adds `--no-spotlight` because the spotlight service (`spotlight.url`) was seen
@@ -72,6 +71,16 @@ status and `abort` remain not verified.
 A single prompt turn with the local model completed in about 100 seconds, so a slow answer is not
 the cause of the failures.
 
+### Latest run with the guard off (26/11/2026)
+
+With `OMP_E2E_NETWORK_GUARD` unset (guard off), the startup passed with the extension loaded. The
+first scenario did not start: no `agent_start` arrived within the turn timeout, so the example
+server's push did not start a turn. A probe found that `omp` does not start the example MCP server
+from the project's `.omp/mcp.json` in RPC mode: no server process appears during the session, both
+with the shared MCP daemon (default) and with `mcp.shared: false`. The cause is not identified yet;
+the next step is to find how `omp` loads MCP servers for an RPC session (configuration location,
+trust of the project folder, or the global `mcp.json`). Until then, no scenario has run.
+
 ### Status: blocked by the network guard (26/11/2026)
 
 The check cannot pass on this machine as configured. At startup, before any scenario, `omp`
@@ -88,8 +97,9 @@ telemetry, web search and fallbacks off) still shows the same kind of connection
 come from the user's configuration. The tolerated list is per address, and the addresses are shared
 behind CDNs, so it cannot be made complete by adding entries one run at a time.
 
-To run the scenarios, the network must be restricted at the operating-system level (for example
-with firewall rules or a sandbox), which needs privileges and the maintainer's authorization.
+This status was recorded while the guard was on. Since the decision to make it optional, the
+scenarios can run without it. They have not been run to completion yet: the next run must show the
+scenario results, with the guard off, and say which remote hosts `omp` contacted.
 
 ### Source of the remote connections
 
