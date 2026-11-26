@@ -9,7 +9,10 @@
 // It runs a model, so it does nothing unless asked:
 //   OMP_E2E=1 OMP_E2E_MODEL=<provider/model-id> npm run omp:e2e
 //
-// Optional: OMP_E2E_OMP (the omp command, default "omp"), OMP_E2E_BUN_DIR (a folder with a Bun
+// Optional: OMP_E2E_TURN_TIMEOUT_MS (how long each wait for a turn may last, default 600000; a slow
+// local model can take minutes), OMP_E2E_CONFIG (a config overlay file passed as --config, for example one that turns
+// the update check off; the machine's configuration is still loaded underneath it),
+// OMP_E2E_OMP (the omp command, default "omp"), OMP_E2E_BUN_DIR (a folder with a Bun
 // >= 1.4.4 binary, put first on the PATH of the omp process only), OMP_E2E_LOCAL_URL (the local model
 // endpoint checked before starting, default http://127.0.0.1:8888/v1), OMP_E2E_SECOND_AFTER_MS
 // (default 1500).
@@ -60,23 +63,53 @@ const preflight = await fetch(new URL("models", `${localUrl.href.replace(/\/$/, 
 );
 if (preflight === 0) fail(`the local model endpoint did not answer at ${localUrl.origin}`);
 
-// Temporary project outside the repository: it only holds the MCP server entry for this run.
+// Temporary project outside the repository: it holds the MCP server entry and an MCP-only
+// omp-channel configuration (no service, so no replies leave the machine). Without a valid
+// configuration the extension disables itself and never receives the pushed notifications.
 const project = mkdtempSync(join(tmpdir(), "omp-channel-e2e-project-"));
 mkdirSync(join(project, ".omp"));
 writeFileSync(
   join(project, ".omp", "mcp.json"),
   JSON.stringify({ mcpServers: { "omp-channel": { command: process.execPath, args: [server] } } }),
 );
+const channelConfig = join(project, ".omp", "omp-channel.json");
+writeFileSync(
+  channelConfig,
+  JSON.stringify({ mcpServer: "omp-channel", delivery: { deliverAs: "followUp" } }),
+);
+
+// Optional overlay for this run only. Oh My Pi merges it over the machine's configuration; this
+// script never writes it.
+const overlay = env.OMP_E2E_CONFIG;
+if (overlay !== undefined && !existsSync(overlay))
+  fail(`OMP_E2E_CONFIG does not exist: ${overlay}`);
+const overlayArgs = overlay ? [`--config=${overlay}`] : [];
+// The spotlight service (spotlight.url, a remote endpoint) is an auxiliary call that opened a remote
+// connection during a turn. The check runs without it, so the guard only sees the model and the
+// example server.
+const runFlags = ["--no-spotlight"];
 
 const child = spawn(
   ompCommand,
-  ["--mode", "rpc", "--no-session", "--cwd", project, "--model", model, "-e", extension],
+  [
+    "--mode",
+    "rpc",
+    "--no-session",
+    "--cwd",
+    project,
+    "--model",
+    model,
+    ...overlayArgs,
+    ...runFlags,
+    "-e",
+    extension,
+  ],
   {
     cwd: project,
     env: {
       ...env,
       PATH: env.OMP_E2E_BUN_DIR ? `${env.OMP_E2E_BUN_DIR}:${env.PATH ?? ""}` : env.PATH,
-      OMP_CHANNEL_CONFIG: "",
+      OMP_CHANNEL_CONFIG: channelConfig,
       EXAMPLE_CHANNEL_SECOND_AFTER_MS: env.OMP_E2E_SECOND_AFTER_MS ?? "1500",
     },
     stdio: ["pipe", "pipe", "pipe"],
@@ -161,7 +194,13 @@ child.stderr.on("data", (chunk) => {
 
 const sleep = (ms) => new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
 
-async function waitFor(predicate, label, timeoutMs = 180_000) {
+// A local model can take minutes for one answer: every wait for a turn uses this limit.
+const turnTimeoutMs =
+  env.OMP_E2E_TURN_TIMEOUT_MS === undefined ? 600_000 : Number(env.OMP_E2E_TURN_TIMEOUT_MS);
+if (!Number.isInteger(turnTimeoutMs) || turnTimeoutMs <= 0)
+  fail("OMP_E2E_TURN_TIMEOUT_MS must be a positive integer number of milliseconds");
+
+async function waitFor(predicate, label, timeoutMs = turnTimeoutMs) {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
     if (violation) throw new Error(violation);
@@ -182,7 +221,9 @@ async function command(type, payload = {}) {
 }
 
 async function waitForIdle(label) {
-  for (let attempt = 0; attempt < 3000; attempt += 1) {
+  const started = Date.now();
+  while (Date.now() - started < turnTimeoutMs) {
+    if (violation) throw new Error(violation);
     const state = await command("get_state");
     if (state.isStreaming === false) return state;
     await sleep(100);
@@ -296,7 +337,7 @@ async function scenarios() {
   const toolRan = await waitFor(
     () => frames.some((frame) => frame.type === "tool_execution_end") || undefined,
     "a tool execution",
-    180_000,
+    turnTimeoutMs,
   ).then(
     () => true,
     (error) => (violation ? Promise.reject(error) : false),
