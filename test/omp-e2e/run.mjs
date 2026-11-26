@@ -27,7 +27,9 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const env = process.env;
 
 if (env.OMP_E2E !== "1") {
-  console.log("skipped: set OMP_E2E=1 and OMP_E2E_MODEL=<provider/model-id> to run the Oh My Pi check");
+  console.log(
+    "skipped: set OMP_E2E=1 and OMP_E2E_MODEL=<provider/model-id> to run the Oh My Pi check",
+  );
   process.exit(0);
 }
 
@@ -37,10 +39,13 @@ function fail(message) {
 }
 
 const model = env.OMP_E2E_MODEL;
-if (!model || !model.includes("/")) fail("OMP_E2E_MODEL must be provider/model-id; no model is assumed");
+if (!model?.includes("/"))
+  fail("OMP_E2E_MODEL must be provider/model-id; no model is assumed");
 const localUrl = new URL(env.OMP_E2E_LOCAL_URL ?? "http://127.0.0.1:8888/v1");
-const loopback = (host) => host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1";
-if (!loopback(localUrl.hostname)) fail(`OMP_E2E_LOCAL_URL must be loopback, got ${localUrl.hostname}`);
+const loopback = (host) =>
+  host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1";
+if (!loopback(localUrl.hostname))
+  fail(`OMP_E2E_LOCAL_URL must be loopback, got ${localUrl.hostname}`);
 const ompCommand = env.OMP_E2E_OMP ?? "omp";
 const extension = join(root, "dist/index.js");
 const server = join(root, "examples/mcp-server/server.mjs");
@@ -50,7 +55,10 @@ if (!existsSync(extension)) fail("dist/index.js is missing: run npm run build fi
 // model itself answers is checked by the first turn below.
 const preflight = await fetch(new URL("models", `${localUrl.href.replace(/\/$/, "")}/`), {
   signal: AbortSignal.timeout(5000),
-}).then((response) => response.status, () => 0);
+}).then(
+  (response) => response.status,
+  () => 0,
+);
 if (preflight === 0) fail(`the local model endpoint did not answer at ${localUrl.origin}`);
 
 // Temporary project outside the repository: it only holds the MCP server entry for this run.
@@ -81,7 +89,9 @@ let violation = "";
 const peersSeen = new Set();
 const run = (file, args) =>
   new Promise((resolveRun) => {
-    execFile(file, args, { maxBuffer: 1 << 20 }, (error, stdout) => resolveRun(error && !stdout ? "" : String(stdout)));
+    execFile(file, args, { maxBuffer: 1 << 20 }, (error, stdout) =>
+      resolveRun(error && !stdout ? "" : String(stdout)),
+    );
   });
 
 async function processTree(rootPid) {
@@ -93,11 +103,13 @@ async function processTree(rootPid) {
     children.set(ppid, [...(children.get(ppid) ?? []), pid]);
   }
   const pids = [rootPid];
-  for (let index = 0; index < pids.length; index += 1) pids.push(...(children.get(pids[index]) ?? []));
+  for (let index = 0; index < pids.length; index += 1)
+    pids.push(...(children.get(pids[index]) ?? []));
   return pids;
 }
 
-const isLoopbackHost = (host) => host.startsWith("127.") || host === "[::1]" || host === "::1" || host === "localhost";
+const isLoopbackHost = (host) =>
+  host.startsWith("127.") || host === "[::1]" || host === "::1" || host === "localhost";
 
 async function checkNetwork() {
   const pids = await processTree(child.pid);
@@ -165,7 +177,8 @@ async function command(type, payload = {}) {
   const id = `e2e-${nextId++}`;
   child.stdin.write(`${JSON.stringify({ id, type, ...payload })}\n`);
   const response = await waitFor(() => responses.get(id), `response to ${type}`, 60_000);
-  if (response.success !== true) throw new Error(`${type} failed: ${String(response.error ?? "unknown")}`);
+  if (response.success !== true)
+    throw new Error(`${type} failed: ${String(response.error ?? "unknown")}`);
   return response.data;
 }
 
@@ -181,34 +194,50 @@ async function waitForIdle(label) {
 function userTexts(messages) {
   return (messages ?? []).flatMap((message) => {
     const content = Array.isArray(message.content) ? message.content : [message.content];
-    return content.map((part) => (typeof part === "string" ? part : part?.text ?? "")).filter(Boolean);
+    return content
+      .map((part) => (typeof part === "string" ? part : (part?.text ?? "")))
+      .filter(Boolean);
   });
 }
 
 // The agent_end frame must carry an assistant answer with text, not an error.
 function assertModelAnswered(index) {
   const frame = frames[index];
-  const assistant = [...(frame.messages ?? [])].reverse().find((message) => message.role === "assistant");
+  const assistant = [...(frame.messages ?? [])]
+    .reverse()
+    .find((message) => message.role === "assistant");
   if (!assistant) throw new Error("the model produced no assistant message");
-  if (assistant.stopReason === "error") throw new Error(`the model returned an error: ${String(assistant.errorMessage ?? "error")}`);
-  const text = (Array.isArray(assistant.content) ? assistant.content : []).map((part) => part?.text ?? "").join("");
+  if (assistant.stopReason === "error")
+    throw new Error(`the model returned an error: ${String(assistant.errorMessage ?? "error")}`);
+  const text = (Array.isArray(assistant.content) ? assistant.content : [])
+    .map((part) => part?.text ?? "")
+    .join("");
   if (text.trim().length === 0) throw new Error("the model answered with no text");
 }
 
 const results = [];
 function record(name, status, detail, durationMs) {
   results.push({ name, status, detail, durationMs });
-  console.log(`${status.toUpperCase().padEnd(14)} ${name} (${durationMs} ms)${detail ? ` - ${detail}` : ""}`);
+  console.log(
+    `${status.toUpperCase().padEnd(14)} ${name} (${durationMs} ms)${detail ? ` - ${detail}` : ""}`,
+  );
 }
 
 async function scenarios() {
   let started = Date.now();
-  await waitFor(() => frames.some((frame) => frame.type === "ready"), "the RPC ready frame", 60_000);
+  await waitFor(
+    () => frames.some((frame) => frame.type === "ready"),
+    "the RPC ready frame",
+    60_000,
+  );
   record("startup", "pass", "RPC ready", Date.now() - started);
 
   // 1. Idle agent: the first push starts a turn that must be answered.
   started = Date.now();
-  await waitFor(() => frames.some((frame) => frame.type === "agent_start"), "the first agent_start");
+  await waitFor(
+    () => frames.some((frame) => frame.type === "agent_start"),
+    "the first agent_start",
+  );
   const firstEndIndex = await waitFor(() => {
     const index = frames.findIndex((frame) => frame.type === "agent_end");
     return index === -1 ? undefined : index;
@@ -218,23 +247,43 @@ async function scenarios() {
   const branch = await command("get_branch_messages");
   const delivered = userTexts(branch.messages).join("\n").includes('messageId="example-1"');
   if (!delivered) throw new Error("the pushed message is not in the session branch");
-  record("idle push starts a turn", "pass", "push delivered, model answered, message in branch", Date.now() - started);
+  record(
+    "idle push starts a turn",
+    "pass",
+    "push delivered, model answered, message in branch",
+    Date.now() - started,
+  );
 
   // 2. Busy agent: the second push must start only after the turn that is running has ended.
   started = Date.now();
-  const secondIndex = await waitFor(() => {
-    const index = frames.findIndex((frame) => frame.type === "message_start" && JSON.stringify(frame).includes("example-1-2"));
-    return index === -1 ? undefined : index;
-  }, "the second push", 120_000).catch(() => -1);
+  const secondIndex = await waitFor(
+    () => {
+      const index = frames.findIndex(
+        (frame) => frame.type === "message_start" && JSON.stringify(frame).includes("example-1-2"),
+      );
+      return index === -1 ? undefined : index;
+    },
+    "the second push",
+    120_000,
+  ).catch(() => -1);
   if (secondIndex === -1) {
-    record("push during a turn is queued", "not-exercised", "the second push did not arrive", Date.now() - started);
+    record(
+      "push during a turn is queued",
+      "not-exercised",
+      "the second push did not arrive",
+      Date.now() - started,
+    );
   } else {
-    const turnEnd = frames.findIndex((frame, position) => frame.type === "agent_end" && position < secondIndex && position > 0);
+    const turnEnd = frames.findIndex(
+      (frame, position) => frame.type === "agent_end" && position < secondIndex && position > 0,
+    );
     const queued = turnEnd !== -1 && turnEnd < secondIndex;
     record(
       "push during a turn is queued",
       queued ? "pass" : "fail",
-      queued ? "the second push started after an agent_end" : "the second push started before any agent_end",
+      queued
+        ? "the second push started after an agent_end"
+        : "the second push started before any agent_end",
       Date.now() - started,
     );
   }
@@ -249,11 +298,19 @@ async function scenarios() {
     () => frames.some((frame) => frame.type === "tool_execution_end") || undefined,
     "a tool execution",
     180_000,
-  ).then(() => true, (error) => (violation ? Promise.reject(error) : false));
+  ).then(
+    () => true,
+    (error) => (violation ? Promise.reject(error) : false),
+  );
   await command("abort");
   const idle = await waitForIdle("after abort");
   if (!toolRan) {
-    record("abort after a tool run", "not-exercised", "the model did not run the shell tool", Date.now() - started);
+    record(
+      "abort after a tool run",
+      "not-exercised",
+      "the model did not run the shell tool",
+      Date.now() - started,
+    );
   } else {
     const after = await command("get_branch_messages");
     const kept = JSON.stringify(after.messages).includes("omp-channel-marker");
@@ -285,7 +342,13 @@ try {
 }
 
 const failed = results.filter((item) => item.status === "fail");
-console.log(JSON.stringify({ model, localUrl: localUrl.origin, loopbackPeersSeen: [...peersSeen].sort(), results }, null, 2));
+console.log(
+  JSON.stringify(
+    { model, localUrl: localUrl.origin, loopbackPeersSeen: [...peersSeen].sort(), results },
+    null,
+    2,
+  ),
+);
 if (stderr.trim().length > 0) {
   console.log("--- stderr of the omp process (first 2000 characters)");
   console.log(stderr.slice(0, 2000));

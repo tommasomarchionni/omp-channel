@@ -14,8 +14,8 @@ Oh My Pi needs **Bun 1.4.4 or later** at runtime.
 | ----------------------------------------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | Oh My Pi starts in RPC mode with `-e dist/index.js`                     | verified     | RPC `ready` frame received                                                                                                                      |
 | The extension module is loaded and its default export runs              | verified     | Oh My Pi printed `[omp-channel] disabled: ...` on stderr when the configuration path did not exist; that line comes only from the loaded module |
-| MCP server connects and `mcp_notification` reaches the extension        | not verified | the run stopped before any turn (see "Last real run")                                                                                          |
-| First push starts a turn on an idle agent                               | not verified | scenario 1: not reached, see "Last real run"                                                                                                   |
+| MCP server connects and `mcp_notification` reaches the extension        | not verified | the run stopped before any turn (see "Last real run")                                                                                           |
+| First push starts a turn on an idle agent                               | not verified | scenario 1: not reached, see "Last real run"                                                                                                    |
 | Push during a running turn is queued as follow-up (not steer)           | not verified | scenario 2: not reached                                                                                                                         |
 | `sendUserMessage` attribution values (`user`, `agent`) and their effect | open point   | see below                                                                                                                                       |
 | `abort` stops the turn and keeps tool results                           | not verified | scenario 3: not reached                                                                                                                         |
@@ -50,10 +50,10 @@ The script prints one line per check (`pass`, `fail` or `not-exercised`) and a J
 Command: `OMP_E2E=1 OMP_E2E_MODEL=unsloth/inkling-2-mini-unsloth:UD-Q4_K_XL OMP_E2E_BUN_DIR=<folder with bun 1.4.4> npm run omp:e2e`
 (Oh My Pi 19.2.1, the default configuration, the local endpoint at `127.0.0.1:8888`).
 
-| Check               | Result        | Duration | What was observed                                                                 |
-| ------------------- | ------------- | -------- | -------------------------------------------------------------------------------- |
-| startup             | pass          | 807 ms   | RPC `ready` frame received                                                        |
-| run (scenarios 1-3) | fail (guard)  | 0 ms     | `omp` connected to a non-loopback address (`104.26.10.114:443`) before any turn   |
+| Check               | Result       | Duration | What was observed                                                               |
+| ------------------- | ------------ | -------- | ------------------------------------------------------------------------------- |
+| startup             | pass         | 807 ms   | RPC `ready` frame received                                                      |
+| run (scenarios 1-3) | fail (guard) | 0 ms     | `omp` connected to a non-loopback address (`104.26.10.114:443`) before any turn |
 
 Other loopback peers seen: `127.0.0.1:8888` (the model endpoint) and `127.0.0.1:11434`, which was not
 identified. Earlier runs of the same script stopped the same way, on another non-loopback address
