@@ -50,30 +50,16 @@ are the defaults.
 
 ### 3.1 `message`
 
-| Field            | Required | Type and limits                                                              | Meaning                                                                                  |
-| ---------------- | -------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `type`           | yes      | `"message"`                                                                  |                                                                                          |
-| `conversationId` | yes      | identifier                                                                   | The conversation the message belongs to (section 5).                                     |
-| `messageId`      | yes      | identifier                                                                   | Unique id of this message. Used to reply and to deduplicate.                             |
-| `sender`         | yes      | string, 1 to 64 characters after cleanup                                     | Display name. Control characters become spaces.                                          |
-| `text`           | yes      | string, 1 to 4000 characters, no control characters except tab and line feed | The content.                                                                             |
-| `sentAt`         | no       | ISO 8601 timestamp                                                           | Set by the service. Informational.                                                       |
-| `replyTo`        | no       | identifier                                                                   | `messageId` of an earlier message this one answers. Informational.                       |
-| `attribution`    | yes      | `"user"` or `"agent"`                                                        | Who wrote the message. Passed to Oh My Pi unchanged. See section 3.4 for the open point. |
-
-### 3.4 Open point: `attribution` values
-
-`attribution` is required, and omp-channel sets no default for it. The value is handed to Oh My Pi
-as the `attribution` option of `sendUserMessage`. What Oh My Pi does with each value (for
-example whether it changes how the turn is billed or which initiator it records) is **not verified**.
-
-The service sets `attribution` to the value that describes who wrote the message: `"user"` for text
-a person wrote (the example server sends `"user"`), `"agent"` for text another agent wrote.
-omp-channel does not choose a value on the service's behalf.
-
-How to verify: run the end-to-end script in `test/omp-e2e/` once with each value, then compare the
-recorded initiator of the turn in the Oh My Pi session output. The result is recorded in
-`docs/omp-verification.md`. Only then may a default be documented.
+| Field            | Required | Type and limits                                                              | Meaning                                                               |
+| ---------------- | -------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `type`           | yes      | `"message"`                                                                  |                                                                       |
+| `conversationId` | yes      | identifier                                                                   | The conversation the message belongs to (section 5).                  |
+| `messageId`      | yes      | identifier                                                                   | Unique id of this message. Used to reply and to deduplicate.          |
+| `sender`         | yes      | string, 1 to 64 characters after cleanup                                     | Display name. Control characters become spaces.                       |
+| `text`           | yes      | string, 1 to 4000 characters, no control characters except tab and line feed | The content.                                                          |
+| `sentAt`         | no       | ISO 8601 timestamp                                                           | Set by the service. Informational.                                    |
+| `replyTo`        | no       | identifier                                                                   | `messageId` of an earlier message this one answers. Informational.    |
+| `attribution`    | yes      | `"user"` or `"agent"`                                                        | Who wrote the message. Passed to Oh My Pi unchanged. See section 3.4. |
 
 ### 3.2 `interrupt`
 
@@ -98,6 +84,18 @@ Asks the agent to stop the turn in progress in that conversation. Effects, as im
 Ends the open conversation so another conversation can start. A turn in progress is not
 aborted; send `interrupt` first to stop it. A `close` for a conversation that is not open is
 acknowledged and ignored.
+
+### 3.4 `attribution` values
+
+`attribution` is required on every message, and omp-channel sets no default for it. The value is
+handed to Oh My Pi as the `attribution` option of `sendUserMessage`. The service sets it to the value
+that describes who wrote the message: `"user"` for text a person wrote (the example server sends
+`"user"`), `"agent"` for text another agent wrote. omp-channel does not choose a value on the
+service's behalf.
+
+What Oh My Pi does with each value (for example whether it changes how the turn is billed or which
+initiator it records) is **not verified**. The result will be recorded in
+`docs/omp-verification.md`, section "Attribution".
 
 ## 4. HTTP transport
 

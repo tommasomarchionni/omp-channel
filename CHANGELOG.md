@@ -13,11 +13,18 @@ and the project uses [Semantic Versioning](https://semver.org) once it reaches 1
   before packing.
 - CI runs the pack check and a dependency audit; the release workflow has an opt-in npm publish job
   that uses trusted publishing.
-
 - Oh My Pi types now come from the exact devDependency `@oh-my-pi/pi-coding-agent@19.2.1`; the
   hand-written declaration subset was removed.
-- `attribution` is required on every message. There is no configuration default for it; the open
-  point is documented in docs/protocol.md, section 3.4.
+- `attribution` is required on every message and has no configuration default. The example server
+  sends `"user"`. The effect of each value in Oh My Pi is not verified; see docs/protocol.md,
+  section 3.4.
+
+### Fixed
+
+- The Oh My Pi check gives the extension a valid configuration. Before, the extension disabled
+  itself and the check never exercised it.
+- The Oh My Pi check waits up to `OMP_E2E_TURN_TIMEOUT_MS` (default 600000 ms) for each turn, so a
+  slow local model is not reported as a failure.
 
 ### Added
 
