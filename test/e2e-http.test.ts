@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import ompChannel from "../src/index.js";
-import { fakePi, flush, resultText } from "./helpers.js";
+import { fakePi, resultText } from "./helpers.js";
 
 /** Local stand-in for a service: loopback only, no external host is contacted. */
 function startService(key: string) {
