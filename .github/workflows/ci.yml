@@ -8,10 +8,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     name: Check (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
     strategy:
@@ -32,3 +37,6 @@ jobs:
       - run: npm run format:check
       - run: npm test
       - run: npm run build
+      - run: npm pack --dry-run
+      - name: Audit runtime dependencies
+        run: npm audit --omit=dev --audit-level=high
