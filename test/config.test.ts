@@ -13,6 +13,16 @@ function sources(files: Record<string, string>, env: Record<string, string> = {}
 
 const serviceFile = JSON.stringify({ service: { url: "https://chat.example.com/api" } });
 
+function errorOf(file: unknown): string {
+  try {
+    loadConfig(sources({ [configPath]: JSON.stringify(file) }));
+  } catch (error) {
+    assert.ok(error instanceof ConfigError);
+    return error.message;
+  }
+  assert.fail("expected a ConfigError");
+}
+
 describe("loadConfig", () => {
   it("uses safe defaults when no file exists and no service is set", () => {
     const config = loadConfig(sources({}));
@@ -88,6 +98,36 @@ describe("loadConfig", () => {
       () =>
         loadConfig(sources({ [configPath]: JSON.stringify({ delivery: { deliverAs: "now" } }) })),
       ConfigError,
+    );
+  });
+
+  it("names the unknown key and lists the allowed ones", () => {
+    const message = errorOf({ limit: { maxPending: 3 } });
+    assert.match(message, /unknown key "limit"/);
+    assert.match(message, /the file/);
+    assert.match(message, /limits/);
+    const nested = errorOf({ poll: { interval: 5 } });
+    assert.match(nested, /unknown key "interval" at \/poll/);
+  });
+
+  it("lists the allowed values of an enum", () => {
+    const message = errorOf({ delivery: { deliverAs: "now" } });
+    assert.match(message, /\/delivery\/deliverAs/);
+    assert.match(message, /steer, followUp, aside/);
+    assert.doesNotMatch(message, /"now"/);
+  });
+
+  it("states the allowed range of a number and the missing required key", () => {
+    assert.match(errorOf({ limits: { maxPending: 0 } }), /at least 1/);
+    assert.match(errorOf({ limits: { maxPending: 1000 } }), /at most 100/);
+    assert.match(errorOf({ poll: { batchSize: 1.5 } }), /must be an integer/);
+    assert.match(errorOf({ service: {} }), /missing required key "url" at \/service/);
+  });
+
+  it("says what the file must be when it is not a JSON object", () => {
+    assert.throws(
+      () => loadConfig(sources({ [configPath]: "[]" })),
+      /the configuration file must be a JSON object/,
     );
   });
 

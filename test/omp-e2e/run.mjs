@@ -39,8 +39,7 @@ function fail(message) {
 }
 
 const model = env.OMP_E2E_MODEL;
-if (!model?.includes("/"))
-  fail("OMP_E2E_MODEL must be provider/model-id; no model is assumed");
+if (!model?.includes("/")) fail("OMP_E2E_MODEL must be provider/model-id; no model is assumed");
 const localUrl = new URL(env.OMP_E2E_LOCAL_URL ?? "http://127.0.0.1:8888/v1");
 const loopback = (host) =>
   host === "localhost" || host === "127.0.0.1" || host === "[::1]" || host === "::1";

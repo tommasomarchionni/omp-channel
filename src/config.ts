@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { Ajv2020 } from "ajv/dist/2020.js";
+import { Ajv2020, type ErrorObject } from "ajv/dist/2020.js";
 import type { Limits } from "./protocol.js";
 
 export const DEFAULT_CONFIG_RELATIVE_PATH = join(".omp", "omp-channel.json");
@@ -48,7 +48,7 @@ export interface ConfigSources {
 }
 
 const schemaUrl = new URL("../schema/config.schema.json", import.meta.url);
-const ajv = new Ajv2020({ allErrors: false, strict: true, useDefaults: true });
+const ajv = new Ajv2020({ allErrors: false, strict: true, useDefaults: true, verbose: true });
 const validateConfigFile = ajv.compile(JSON.parse(readFileSync(schemaUrl, "utf8")) as object);
 
 /**
@@ -74,12 +74,14 @@ export function loadConfig(sources: ConfigSources): ChannelConfig {
       throw new ConfigError("the configuration file is not valid JSON");
     }
   }
-  const data = typeof raw === "object" && raw !== null ? { ...raw } : raw;
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    throw new ConfigError("the configuration file must be a JSON object");
+  }
+  const data = { ...raw };
   if (!validateConfigFile(data)) {
     const first = validateConfigFile.errors?.[0];
-    const where = first?.instancePath === "" ? "the file" : (first?.instancePath ?? "the file");
     throw new ConfigError(
-      `invalid configuration at ${where}: ${first?.message ?? "unknown error"}`,
+      `invalid configuration: ${first === undefined ? "unknown error" : describeSchemaError(first)}`,
     );
   }
   const parsed = data as {
@@ -101,6 +103,46 @@ export function loadConfig(sources: ConfigSources): ChannelConfig {
     limits: parsed.limits,
     delivery: parsed.delivery,
   };
+}
+
+/**
+ * Turns a schema error into one sentence that names the place and what is allowed. It never
+ * prints the rejected value, so a mistyped key cannot reach a log through this message.
+ */
+function describeSchemaError(error: ErrorObject): string {
+  const params = error.params as Record<string, unknown>;
+  const place = error.instancePath === "" ? "the file" : error.instancePath;
+  const allowed = (error.parentSchema as { properties?: Record<string, unknown> } | undefined)
+    ?.properties;
+  switch (error.keyword) {
+    case "additionalProperties": {
+      const keys = Object.keys(allowed ?? {}).filter((key) => key !== "$schema");
+      const list = keys.length === 0 ? "" : ` (allowed: ${keys.join(", ")})`;
+      return `unknown key "${String(params.additionalProperty)}" at ${place}${list}`;
+    }
+    case "required":
+      return `missing required key "${String(params.missingProperty)}" at ${place}`;
+    case "enum":
+      return `${place} must be one of: ${(params.allowedValues as unknown[]).join(", ")}`;
+    case "minimum":
+      return `${place} must be at least ${String(params.limit)}`;
+    case "maximum":
+      return `${place} must be at most ${String(params.limit)}`;
+    case "type":
+      return `${place} must be ${article(String(params.type))}`;
+    case "pattern":
+      return `${place} has an invalid format`;
+    case "minLength":
+      return `${place} is too short`;
+    case "maxLength":
+      return `${place} is too long`;
+    default:
+      return `${place} ${error.message ?? "is invalid"}`;
+  }
+}
+
+function article(type: string): string {
+  return type === "integer" || type === "object" ? `an ${type}` : `a ${type}`;
 }
 
 interface ServicePaths {
