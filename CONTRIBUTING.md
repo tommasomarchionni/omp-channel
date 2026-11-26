@@ -30,7 +30,7 @@ commands while you work (`npm test`, `npm run lint`) and the full check before y
 - The pull request title is checked by the `pr-title` workflow.
 - The pull request template asks what was verified and how.
 - Do not add generated-by or tool attribution lines to commits or pull requests.
-- Versions and the changelog are updated when a release is prepared, not in feature pull requests.
+- Add a line under `Unreleased` in CHANGELOG.md for a visible change. Versions are changed only when a release is prepared (see docs/releasing.md).
 
 ## Tests
 

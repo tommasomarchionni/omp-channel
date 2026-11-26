@@ -1,5 +1,9 @@
 # omp-channel
 
+[![CI](https://github.com/OWNER/omp-channel/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/omp-channel/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+![Node.js 20+](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)
+
 **omp-channel** is an extension for [Oh My Pi](https://github.com/can1357/oh-my-pi) (OMP), a
 terminal agent harness. It delivers messages from an external service (any system that exchanges messages
 with a person) into an agent session, and sends the agent's replies
@@ -23,6 +27,7 @@ and the model; omp-channel is the link between them.
 - [Configuration](#configuration)
 - [Security](#security)
 - [Compatibility](#compatibility)
+- [Troubleshooting](#troubleshooting)
 - [Development](#development)
 - [Documentation](#documentation)
 - [License](#license)
@@ -215,20 +220,40 @@ Report vulnerabilities privately, as described in [SECURITY.md](SECURITY.md).
 
 ## Compatibility
 
-- **Node.js:** 20 or later (22 is used in CI; see `.nvmrc`).
-- **Oh My Pi:** the extension types come from the exact devDependency
-  `@oh-my-pi/pi-coding-agent@19.2.1`. Oh My Pi runs on **Bun 1.4.4 or later**. The types are
-  imported directly, not copied. One gap is documented in `src/tool-schema.ts`: the tool
-  parameters are plain JSON Schema where Oh My Pi declares a TypeBox schema.
+| Component          | Version               | Status                                                          |
+| ------------------ | --------------------- | --------------------------------------------------------------- |
+| Node.js            | 20 and 22 (CI matrix) | Tested in CI on both. `.nvmrc` pins 22 for development.         |
+| Oh My Pi           | 19.2.1                | Starts and loads the extension. Delivery not yet verified live. |
+| Bun (for Oh My Pi) | 1.4.4 or later        | Required by Oh My Pi itself, not by omp-channel.                |
+| Protocol           | 1 (alpha)             | Fields may still change before 1.0; see the changelog.          |
+
+- The extension types come from the exact devDependency `@oh-my-pi/pi-coding-agent@19.2.1`. They
+  are imported, not copied. One gap is documented in `src/tool-schema.ts`: the tool parameters are
+  plain JSON Schema where Oh My Pi declares a TypeBox schema.
 - **Not verified yet:** delivery of pushed messages to a running session, queueing during a turn,
   abort, and the effect of each `attribution` value. See [docs/omp-verification.md](docs/omp-verification.md).
-- **Installing:** `npm ci` also installs the Oh My Pi package for type checking; it is large.
+- `npm ci` also installs the Oh My Pi package for type checking; it is large.
+
+## Troubleshooting
+
+The extension never stops Oh My Pi. When it cannot start it writes one line to stderr and stays
+off:
+
+| Message                                                   | Cause and fix                                                                     |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `disabled: invalid configuration: unknown key "x" at ...` | A key is misspelled. The message lists the allowed keys.                          |
+| `disabled: ... must be one of: ...`                       | A value is not allowed. The message lists the allowed values.                     |
+| `disabled: set <keyEnv> (or <keyEnv>_FILE) ...`           | The key variable named in `service.keyEnv` is not set in the `omp` process.       |
+| `disabled: OMP_CHANNEL_CONFIG points to a file ...`       | The path in `OMP_CHANNEL_CONFIG` does not exist.                                  |
+| `disabled: service.url must use https ...`                | Use `https`, or a loopback address for local tests.                               |
+| Messages arrive but replies fail                          | Without `service` or `adapterModule`, MCP pushes work but replies cannot be sent. |
 
 ## Development
 
 ```sh
 npm ci
 npm run check          # typecheck, lint, format check and tests
+npm run pack:check     # list the files that would be published (publishes nothing)
 npm run build          # compile to dist/
 OMP_E2E=1 OMP_E2E_MODEL=<provider/model> npm run omp:e2e   # real Oh My Pi check, runs a model
 ```
@@ -241,7 +266,9 @@ format:check`, `npm test`. Tests use the Node.js built-in test runner through `t
 
 - [docs/protocol.md](docs/protocol.md): the integration contract, lease policy and decisions.
 - [schema/](schema): JSON Schemas of the events, replies, status and configuration.
-- [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [CHANGELOG.md](CHANGELOG.md).
+- [docs/omp-verification.md](docs/omp-verification.md): what was checked in a real session and what is open.
+- [docs/releasing.md](docs/releasing.md): how a release is made.
+- [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [SUPPORT.md](SUPPORT.md), [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

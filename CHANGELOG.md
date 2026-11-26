@@ -7,6 +7,13 @@ and the project uses [Semantic Versioning](https://semver.org) once it reaches 1
 
 ### Changed
 
+- Configuration errors name the unknown key, the allowed keys or values, and the allowed range.
+  A configuration file that is a JSON array is refused.
+- `package.json` publishes with `provenance` and public access, ships the changelog, and builds
+  before packing.
+- CI runs the pack check and a dependency audit; the release workflow has an opt-in npm publish job
+  that uses trusted publishing.
+
 - Oh My Pi types now come from the exact devDependency `@oh-my-pi/pi-coding-agent@19.2.1`; the
   hand-written declaration subset was removed.
 - `attribution` is required on every message. There is no configuration default for it; the open
