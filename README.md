@@ -168,9 +168,9 @@ The name `omp-channel` must equal `mcpServer` in the configuration file.
 
 ## Configuration
 
-Every message the service sends must carry `attribution` (`"user"` or `"agent"`). That value is
-passed to Oh My Pi unchanged, and which value fits which message is an open point; see
-[docs/protocol.md](docs/protocol.md), section 3.4.
+Every message the service sends must carry `attribution` (`"user"` for text a person wrote,
+`"agent"` for text another agent wrote). That value is passed to Oh My Pi unchanged. How Oh My Pi
+records each value is still unverified; see [docs/protocol.md](docs/protocol.md), section 3.4.
 
 The configuration file is read from `OMP_CHANNEL_CONFIG`, or from `.omp/omp-channel.json` in the
 working directory when it exists. Without a file the defaults apply and nothing is connected: the

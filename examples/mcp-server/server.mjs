@@ -26,7 +26,7 @@ function emitMessage(id, body) {
       conversationId,
       messageId: id,
       sender: "example-user",
-      attribution: "agent",
+      attribution: "user",
       text: body,
       sentAt: new Date().toISOString(),
     },

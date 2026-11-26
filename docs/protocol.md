@@ -67,9 +67,9 @@ are the defaults.
 as the `attribution` option of `sendUserMessage`. What Oh My Pi does with each value (for
 example whether it changes how the turn is billed or which initiator it records) is **not verified**.
 
-Until it is verified, a service must set `attribution` to the value that describes who wrote the
-message: `"user"` for a person, `"agent"` for another agent. omp-channel does not choose a value on
-its behalf.
+The service sets `attribution` to the value that describes who wrote the message: `"user"` for text
+a person wrote (the example server sends `"user"`), `"agent"` for text another agent wrote.
+omp-channel does not choose a value on the service's behalf.
 
 How to verify: run the end-to-end script in `test/omp-e2e/` once with each value, then compare the
 recorded initiator of the turn in the Oh My Pi session output. The result is recorded in
