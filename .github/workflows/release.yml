@@ -1,0 +1,47 @@
+name: Release
+
+# Manual release: checks the version in package.json, runs the full check, and creates a tag and a
+# GitHub release with generated notes. It publishes nothing to a package registry.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release, for example 0.2.0. Must equal package.json."
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Create release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check the version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          PACKAGE_VERSION="$(node -p 'require("./package.json").version')"
+          if [ "$INPUT_VERSION" != "$PACKAGE_VERSION" ]; then
+            echo "input version $INPUT_VERSION does not match package.json $PACKAGE_VERSION" >&2
+            exit 1
+          fi
+      - run: npm run check
+      - run: npm run build
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ inputs.version }}
+        run: gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --generate-notes

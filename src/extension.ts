@@ -1,0 +1,141 @@
+import type { ChannelAdapter, Delivery } from "./adapter.js";
+import { ACKNOWLEDGED_OUTCOMES, Dispatcher, type SessionPort } from "./dispatcher.js";
+import type { ChannelConfig } from "./config.js";
+import type {
+  AgentToolResult,
+  ExtensionAPI,
+  ExtensionContext,
+  ExtensionFactory,
+} from "./omp-api.js";
+import { parseMcpNotification, parseReplyInput } from "./protocol.js";
+
+export const REPLY_TOOL_NAME = "reply";
+
+export interface ChannelExtensionOptions {
+  readonly config: ChannelConfig;
+  /** Transport adapter (HTTP service or a custom module). Undefined: MCP push only, no replies. */
+  readonly adapter?: ChannelAdapter | undefined;
+  /** Receives short diagnostic lines. They never contain message text or keys. */
+  readonly log?: (line: string) => void;
+}
+
+/**
+ * Creates the extension factory. It registers:
+ * - `mcp_notification`: messages pushed by the configured MCP server enter the agent;
+ * - the `reply` tool: the model answers a message by its messageId;
+ * - lifecycle hooks: agent state is reported to the service, and the adapter stops on shutdown;
+ * - the adapter receive loop, when an adapter is given.
+ */
+export function createChannelExtension(options: ChannelExtensionOptions): ExtensionFactory {
+  return (pi: ExtensionAPI): void => {
+    const { config } = options;
+    const adapter = options.adapter;
+    const log = options.log ?? (() => undefined);
+    let context: ExtensionContext | undefined;
+
+    const session: SessionPort = {
+      send: (content, sendOptions) => pi.sendUserMessage(content, sendOptions),
+      abort: () => context?.abort(),
+      isIdle: () => context?.isIdle() ?? true,
+    };
+    const dispatcher = new Dispatcher({ config, session, adapter, log });
+
+    pi.on("session_start", (_event, ctx) => {
+      context = ctx;
+    });
+
+    pi.on("mcp_notification", (event, ctx) => {
+      context = ctx;
+      const parsed = parseMcpNotification(event, config.mcpServer, config.limits);
+      if (parsed === null) {
+        return;
+      }
+      if (!parsed.ok) {
+        log(`dropped invalid MCP channel notification: ${parsed.reason}`);
+        return;
+      }
+      void dispatcher.submit(parsed.value).then((outcome) => {
+        if (!ACKNOWLEDGED_OUTCOMES.has(outcome)) {
+          log(`MCP channel event not admitted: ${outcome}`);
+        }
+      });
+    });
+
+    pi.on("agent_start", (_event, ctx) => {
+      context = ctx;
+      dispatcher.setStatus("working");
+    });
+
+    pi.on("agent_end", (_event, ctx) => {
+      context = ctx;
+      dispatcher.setStatus("free");
+    });
+
+    if (adapter !== undefined) {
+      const controller = new AbortController();
+      pi.on("session_shutdown", () => {
+        controller.abort();
+      });
+      void runReceiveLoop(adapter, dispatcher, controller.signal, log);
+    }
+
+    pi.registerTool({
+      name: REPLY_TOOL_NAME,
+      label: "Reply to service",
+      description:
+        "Send a reply to an external message. Pass the messageId shown with that message. Only messageIds received in this session are accepted.",
+      parameters: {
+        type: "object",
+        properties: {
+          messageId: { type: "string", minLength: 1, maxLength: 128 },
+          text: { type: "string", minLength: 1, maxLength: config.limits.maxTextLength },
+        },
+        required: ["messageId", "text"],
+        additionalProperties: false,
+      },
+      async execute(_toolCallId, params, _signal, _onUpdate, ctx): Promise<AgentToolResult> {
+        context = ctx;
+        const parsed = parseReplyInput(params, config.limits);
+        if (!parsed.ok) {
+          return textResult(`Reply rejected: ${parsed.reason}.`);
+        }
+        const result = await dispatcher.reply(parsed.value.messageId, parsed.value.text);
+        return textResult(result.ok ? "Reply sent." : `Reply not sent: ${result.reason}.`);
+      },
+    });
+  };
+}
+
+/**
+ * Takes deliveries from the adapter one at a time. A delivery is acknowledged only after the agent
+ * admitted it, so a crash before that point leads to redelivery rather than loss.
+ */
+async function runReceiveLoop(
+  adapter: ChannelAdapter,
+  dispatcher: Dispatcher,
+  signal: AbortSignal,
+  log: (line: string) => void,
+): Promise<void> {
+  try {
+    for await (const delivery of adapter.receive(signal) as AsyncIterable<Delivery>) {
+      const outcome = await dispatcher.submit(delivery.event, delivery.deliveryId);
+      if (!ACKNOWLEDGED_OUTCOMES.has(outcome)) {
+        log(`delivery not admitted (${outcome}); the service will deliver it again`);
+        continue;
+      }
+      if (delivery.deliveryId !== undefined && adapter.ack !== undefined) {
+        await adapter.ack(delivery.deliveryId).catch(() => {
+          log("could not acknowledge a delivery; the service may deliver it again");
+        });
+      }
+    }
+  } catch (error) {
+    if (!signal.aborted) {
+      log(`receive loop stopped (${error instanceof Error ? error.name : "unknown"})`);
+    }
+  }
+}
+
+function textResult(text: string): AgentToolResult {
+  return { content: [{ type: "text", text }] };
+}

@@ -1,0 +1,8 @@
+omp-channel
+Copyright 2026 The omp-channel contributors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This project is an independent extension. It is not affiliated with, endorsed by,
+or sponsored by the Oh My Pi project. It loads into Oh My Pi through its public
+extension mechanism and does not include any Oh My Pi source code.

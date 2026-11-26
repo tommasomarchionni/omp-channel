@@ -1,0 +1,12 @@
+{
+  "$schema": "../../schema/config.schema.json",
+  "mcpServer": "omp-channel",
+  "service": {
+    "url": "https://chat.example.com/api/omp-channel",
+    "keyEnv": "EXAMPLE_CHANNEL_KEY"
+  },
+  "delivery": {
+    "deliverAs": "followUp",
+    "attribution": "agent"
+  }
+}

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/OWNER/omp-channel/security/advisories/new
+    about: Report vulnerabilities privately. Do not open a public issue for them.
+  - name: Protocol and configuration reference
+    url: https://github.com/OWNER/omp-channel/blob/main/docs/protocol.md
+    about: Read the integration contract before asking how a field works.

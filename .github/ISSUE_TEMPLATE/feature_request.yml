@@ -1,0 +1,25 @@
+name: Feature request
+description: Propose a change to the extension or the protocol
+labels: ["type: feature", "status: needs-triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What you are trying to do and why the current behaviour is not enough.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: The change you suggest. For a protocol change, say which field or event changes.
+    validations:
+      required: true
+  - type: checkboxes
+    id: contract
+    attributes:
+      label: Compatibility
+      options:
+        - label: This changes the integration protocol (docs/protocol.md)
+        - label: This changes the configuration file

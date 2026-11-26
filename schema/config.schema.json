@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/omp-channel/schema/config.schema.json",
+  "title": "omp-channel configuration",
+  "description": "Configuration file read by omp-channel. Secrets are never stored here: keyEnv names the environment variable that holds the key.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "mcpServer": {
+      "description": "Name of the MCP server (as in the Oh My Pi MCP configuration) that may push messages.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "default": "omp-channel"
+    },
+    "service": {
+      "description": "HTTP service that exchanges messages with the agent. Omit it to use only MCP push or a custom adapter.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url"],
+      "properties": {
+        "url": {
+          "description": "Base URL of the service. https is required, except for loopback addresses.",
+          "type": "string",
+          "minLength": 8
+        },
+        "keyEnv": {
+          "description": "Name of the environment variable that holds the service key. A file path may be given in the variable named <keyEnv>_FILE.",
+          "type": "string",
+          "pattern": "^[A-Z_][A-Z0-9_]{0,63}$",
+          "default": "OMP_CHANNEL_KEY"
+        },
+        "requestTimeoutMs": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 120000,
+          "default": 10000
+        },
+        "paths": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "messages": { "type": "string", "pattern": "^/", "default": "/messages" },
+            "ack": { "type": "string", "pattern": "^/", "default": "/messages/ack" },
+            "replies": { "type": "string", "pattern": "^/", "default": "/replies" },
+            "status": { "type": "string", "pattern": "^/", "default": "/status" }
+          },
+          "default": {}
+        }
+      }
+    },
+    "poll": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "intervalMs": { "type": "integer", "minimum": 100, "maximum": 60000, "default": 2000 },
+        "maxBackoffMs": { "type": "integer", "minimum": 100, "maximum": 300000, "default": 30000 },
+        "batchSize": { "type": "integer", "minimum": 1, "maximum": 100, "default": 10 }
+      },
+      "default": {}
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxTextLength": { "type": "integer", "minimum": 1, "maximum": 20000, "default": 4000 },
+        "maxSenderLength": { "type": "integer", "minimum": 1, "maximum": 256, "default": 64 },
+        "maxPending": { "type": "integer", "minimum": 1, "maximum": 100, "default": 5 }
+      },
+      "default": {}
+    },
+    "delivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "deliverAs": {
+          "description": "How an incoming message is queued in Oh My Pi while the agent is busy.",
+          "type": "string",
+          "enum": ["steer", "followUp", "aside"],
+          "default": "followUp"
+        },
+        "attribution": {
+          "description": "Default attribution of an incoming message when the service does not set one.",
+          "type": "string",
+          "enum": ["user", "agent"],
+          "default": "agent"
+        }
+      },
+      "default": {}
+    },
+    "adapterModule": {
+      "description": "Path (relative to the working directory) of a JavaScript module whose default export implements ChannelAdapter. Replaces the HTTP service transport.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    }
+  }
+}

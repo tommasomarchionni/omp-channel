@@ -1,0 +1,39 @@
+name: Bug report
+description: Something does not work as documented
+labels: ["type: bug", "status: needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not paste keys, tokens or private message content. For a security problem use the Security tab instead."
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: A minimal configuration and steps, or a failing test.
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: omp-channel version, Node.js version, Oh My Pi version.
+    validations:
+      required: true
+  - type: dropdown
+    id: transport
+    attributes:
+      label: Transport
+      options:
+        - HTTP service
+        - MCP push
+        - Adapter module
+        - Not sure
+    validations:
+      required: true

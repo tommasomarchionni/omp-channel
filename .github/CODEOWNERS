@@ -1,0 +1,5 @@
+# Replace @OWNER with the maintainer account before publishing.
+* @OWNER
+/.github/ @OWNER
+/schema/ @OWNER
+/docs/protocol.md @OWNER
