@@ -118,23 +118,47 @@ const child = spawn(
 );
 
 // ---- network guard ------------------------------------------------------------------------------
-// Remote hosts the check tolerates on purpose. The guard sees addresses, not names, so each host is
-// resolved once before the run and its addresses are allowed for the whole run. An address can be
-// shared with other sites behind the same CDN, so an entry also admits those; keep the list short.
-const TOLERATED_HOSTS = [
+// Remote destinations the check tolerates on purpose. The guard sees addresses, not names. An entry
+// is either a host (resolved once before the run) or a list of addresses. An address can be shared
+// with other sites behind the same CDN, so an entry also admits those. Each entry prints its reason.
+const TOLERATED = [
   {
     host: "catalog.stencil.so",
     reason:
       "seen once at startup on 26/11/2026; purpose not documented; Stencil Labs is the author of @oh-my-pi/pi-catalog",
   },
+  {
+    label: "startup addresses",
+    addresses: [
+      "43.98.246.135",
+      "43.106.123.215",
+      "54.230.183.54",
+      "54.230.183.99",
+      "64.239.109.65",
+      "64.239.123.65",
+      "104.18.2.115",
+      "104.18.3.115",
+      "104.18.10.160",
+      "104.18.28.226",
+      "104.26.8.108",
+      "140.82.113.22",
+      "142.251.141.243",
+    ],
+    reason:
+      "seen at startup in several runs on 26/11/2026, with no prompt sent; probably the endpoints that model discovery at startup contacts for the configured providers (not verified which address belongs to which provider)",
+  },
 ];
-const toleratedAddresses = new Map();
+const toleratedAddresses = new Map(); // address -> entry name
 const toleratedSeen = new Set();
-for (const { host, reason } of TOLERATED_HOSTS) {
-  const addresses = await resolve4(host).catch(() => []);
-  if (addresses.length === 0) fail(`tolerated host ${host} does not resolve; the check stops`);
-  for (const address of addresses) toleratedAddresses.set(address, host);
-  console.log(`tolerated remote host: ${host} -> ${addresses.join(", ")} (${reason})`);
+for (const entry of TOLERATED) {
+  const name = entry.host ?? entry.label;
+  const addresses =
+    entry.host === undefined ? entry.addresses : await resolve4(entry.host).catch(() => []);
+  if (addresses.length === 0) fail(`tolerated host ${name} does not resolve; the check stops`);
+  for (const address of addresses) toleratedAddresses.set(address, name);
+  console.log(
+    `tolerated remote destinations: ${name} -> ${addresses.join(", ")} (${entry.reason})`,
+  );
 }
 
 let violation = "";
@@ -424,10 +448,13 @@ console.log(
       model,
       localUrl: localUrl.origin,
       peersSeen: [...peersSeen].sort(),
-      toleratedHosts: TOLERATED_HOSTS.map(({ host }) => ({
-        host,
-        addresses: [...toleratedAddresses].filter(([, name]) => name === host).map(([a]) => a),
-      })),
+      tolerated: TOLERATED.map((entry) => {
+        const name = entry.host ?? entry.label;
+        return {
+          name,
+          addresses: [...toleratedAddresses].filter(([, n]) => n === name).map(([a]) => a),
+        };
+      }),
       toleratedSeen: [...toleratedSeen].sort(),
       results,
     },

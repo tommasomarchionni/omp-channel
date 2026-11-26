@@ -45,9 +45,10 @@ OMP_E2E=1 OMP_E2E_MODEL=<provider/model-id> npm run omp:e2e
   configuration underneath it, so the providers stay the same. The script never writes it.
 - A network guard checks every TCP connection of the `omp` process tree every 300 ms. On the first
   connection to a non-loopback address it stops `omp` and fails the run. A run that fails this way
-  is not a pass for any scenario. The only exception is `TOLERATED_HOSTS` in the script: one host,
-  `catalog.stencil.so`, resolved before the run and printed at its start, with its reason. Its
-  addresses are shared behind a CDN, so the exception also admits other sites on those addresses.
+  is not a pass for any scenario. The only exceptions are the entries of `TOLERATED` in the script:
+  `catalog.stencil.so` (resolved before the run) and a list of addresses seen at startup. Each entry
+  is printed at the start of the run with its reason. The addresses are shared behind CDNs, so an
+  entry also admits other sites on them, and a list of addresses changes from one run to the next.
 - The machine's configuration is not edited. It keeps its remote fallbacks, web search endpoints,
   the spotlight service and the automatic update check, which are deliberate choices of the machine
   owner. The run adds `--no-spotlight` because the spotlight service (`spotlight.url`) was seen
