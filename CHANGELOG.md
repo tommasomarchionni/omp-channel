@@ -5,6 +5,8 @@ and the project uses [Semantic Versioning](https://semver.org) once it reaches 1
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-27
+
 ### Changed
 
 - Configuration errors name the unknown key, the allowed keys or values, and the allowed range.

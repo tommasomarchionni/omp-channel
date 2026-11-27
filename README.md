@@ -1,8 +1,11 @@
 # omp-channel
 
 [![CI](https://github.com/tommasomarchionni/omp-channel/actions/workflows/ci.yml/badge.svg)](https://github.com/tommasomarchionni/omp-channel/actions/workflows/ci.yml)
+
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Node.js 20+](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)
+
+Documentation: <https://tommasomarchionni.github.io/omp-channel/>
 
 **omp-channel** is an extension for [Oh My Pi](https://github.com/can1357/oh-my-pi) (OMP), a
 terminal agent harness. It delivers messages from an external service (any system that exchanges messages
@@ -14,7 +17,7 @@ it work and receive the answers, including while the agent is busy. It is **not*
 service, it contains **no models**, and it does **not** manage accounts. You provide the service
 and the model; omp-channel is the link between them.
 
-> **Status: alpha, not published.** The behaviour is covered by automated tests that use fakes and
+> **Status: alpha, version 0.1.0 on npm.** The behaviour is covered by automated tests that use fakes and
 > a loopback HTTP service. Startup, delivery to an idle session, queueing during a turn and abort
 > have passed in a live Oh My Pi session; the status report and the attribution values are not yet
 > verified. See
@@ -50,18 +53,20 @@ until the open one is closed.
 
 ## Connect a service in three steps
 
-### 0. Install from the package registry
-
-The package is not published yet. Until it is, install from a clone (step 1). When it is published,
-the command is:
+### 0. Install the extension
 
 ```sh
 omp install omp-channel
 ```
 
-Oh My Pi installs the extension and loads it in its sessions. To check it, start a session and run
-`/channel-status`: it shows the transport in use and, when an adapter is configured, what the
-adapter reports.
+This installs the published package into Oh My Pi's plugin folder (`~/.omp/plugins`). The
+extension then loads in every session: no `-e` flag and no path to set. Check it by starting a
+session and running `/channel-status`: it shows the transport in use and, when an adapter is
+configured, what the adapter reports.
+
+The configuration file is read from `.omp/omp-channel.json` in the directory where Oh My Pi
+starts, or from the path in `OMP_CHANNEL_CONFIG` when that variable is set. Without either, the
+extension has no transport and only offers MCP push. The steps below write this file.
 
 A service that needs its own protocol connects through an adapter module (section 6 of
 [docs/protocol.md](docs/protocol.md)). Point `adapterModule` at it in the configuration file, and
@@ -75,11 +80,9 @@ give the adapter the environment it reads:
 }
 ```
 
-Set `OMP_CHANNEL_CONFIG` to the path of that file before starting `omp`.
+### 1. Install from a clone (for development)
 
-The steps below are for installing from a clone of this repository, for development.
-
-### 1. Install the extension from a clone
+Use this only to change the extension itself. The steps below need the built `dist/index.js`:
 
 ```sh
 git clone https://github.com/tommasomarchionni/omp-channel.git
@@ -88,11 +91,7 @@ npm ci
 npm run build
 ```
 
-Oh My Pi loads an extension from the path you give it. The simplest way is the `-e` flag, shown in
-the example below. You can also copy or link `dist/index.js` into one of the extension folders
-that Oh My Pi reads (for example `<project>/.omp/extensions` or `~/.omp/agent/extensions`), or
-list it in the `extensions` setting of your Oh My Pi configuration. Check the loading rules of
-your Oh My Pi version.
+Load the built file with the `-e` flag, as in the example below, instead of `omp install`.
 
 ### 2. Choose how messages arrive
 
