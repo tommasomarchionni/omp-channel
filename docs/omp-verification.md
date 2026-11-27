@@ -240,3 +240,32 @@ that yields one message and records the calls. No real model ran.
 Not verified: the report after Oh My Pi gives up on a retried request (the run was stopped during
 the retries; unit tests cover the logic), the interactive terminal interface (RPC mode only), and
 the `failure` call of the HTTP transport against a real service.
+
+## Reply tool (27/11/2026, Oh My Pi 19.2.1, RPC mode)
+
+Method: a loopback endpoint that records the tools of each model request, then one run with a local
+model; a test adapter module and a stand-in service.
+
+| Case                           | Result | Observed                                                                |
+| ------------------------------ | ------ | ----------------------------------------------------------------------- |
+| tools sent to the model, 0.2.0 | fail   | built-in tools only: `reply` was missing (extension tools are deferred) |
+| tools sent to the model, fixed | pass   | `reply` is listed with the built-in tools                               |
+| local model answers a message  | pass   | the model called `reply`; the service received the text, then `free`    |
+
+Not verified: the interactive terminal interface.
+
+## No message left waiting (27/11/2026, Oh My Pi 19.2.1, RPC mode)
+
+Method: a loopback model endpoint (a plain answer, or no answer at all), then one run with a local
+model; a test adapter module and a stand-in service.
+
+| Case                                       | Result | Observed                                                              |
+| ------------------------------------------ | ------ | --------------------------------------------------------------------- |
+| answer without a `reply` call              | pass   | the final text arrived as the reply, with a key hidden, then `free`   |
+| interrupt from the service during a turn   | pass   | `failure`: the turn was stopped, then `free`                          |
+| input closed during a turn                 | pass   | `failure`: the agent was closed; Oh My Pi exited by itself            |
+| process ended with `SIGTERM` during a turn | fail   | nothing was sent: a service must show that the agent is not connected |
+| local model answers with the `reply` tool  | pass   | one reply, no duplicate from the final text                           |
+
+Not verified: a session switch, a refused reply against a real service and several messages in one
+run (unit tests cover them).

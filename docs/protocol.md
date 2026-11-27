@@ -266,10 +266,28 @@ that Oh My Pi continues on its own (a retry of a model request, for example) has
 state stays `working`. Status is best effort: a failed report is logged and not retried. Status is
 not part of the acknowledgement logic.
 
-## 9. Failed turn (agent to service)
+## 9. No message is left waiting
 
-A turn can end in an error, for example because the model provider refuses the request. The agent
-then answers nothing, so the service is told:
+Every message the agent took ends with exactly one outcome that the service receives: a `reply`
+(section 6) or a `failure`.
+
+| What happens                                                  | What the service receives                                                                                      |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| The model calls the `reply` tool                              | that reply                                                                                                     |
+| The run ends with an answer and no `reply` call               | the final text of the model, as a reply                                                                        |
+| The same, with `replies.fromFinalText: false` or no text      | `failure`: `The agent finished without sending a reply`                                                        |
+| A model error                                                 | `failure` with the error text                                                                                  |
+| The turn is aborted, or ends before an answer                 | `failure`: `The turn was stopped before the agent answered` or `The agent stopped before finishing its answer` |
+| The service refuses the final text, also after two more tries | `failure`: `The agent answered, but the answer could not be delivered`                                         |
+| One answer covers several messages                            | the answer for the newest, `Answered together with a later message.` as the reply of each older one            |
+| A new, resumed or forked session while a message is open      | `failure`: `The agent moved to another session before it answered`                                             |
+| Oh My Pi closes while a message is open                       | `failure`: `The agent was closed before it answered` (one attempt)                                             |
+| Oh My Pi retries, or background work will continue the run    | nothing yet                                                                                                    |
+
+A process that is killed, or a machine that loses power or network for good, sends nothing: a
+service should show that the agent is not connected.
+
+The `failure` event:
 
 ```json
 {
@@ -284,20 +302,17 @@ then answers nothing, so the service is told:
 
 - One report for each unanswered message: `replyTo` is its `messageId`. `messageId` is generated
   by the agent for each report.
-- Sent only when the run is over. Oh My Pi retries some errors by itself; while it does, nothing is
-  reported.
-- Only a model error is reported. An aborted turn (an interrupt from the service, or from the
-  person at the terminal) is not.
-- A message that already got a reply is never reported. The failed turn blames only the messages
-  it took after the last completed answer.
-- `reason` is optional text for a person: one line, at most 500 characters. Common shapes of
-  secrets (tokens, credentials in headers and addresses) and the name of the home folder are
-  hidden before it is sent. The hiding covers known shapes and is no guarantee: set
-  `failures.includeReason` to `false` to send no text at all.
-- The report is best effort. A refused report is logged and sent again only if a later turn fails
-  for the same message.
-- A reply for the same message is still accepted afterwards, for example when a later turn
-  succeeds. A service that has shown the failure decides what to do with it.
+- A message that already got a reply is never reported.
+- `reason` is optional text for a person: one line, at most 500 characters.
+  `failures.includeReason: false` sends no reason.
+- The final text sent as a reply is the text of the last answer only, never the thinking or a tool
+  result. It keeps its lines and is cut at `limits.maxTextLength`.
+- In both, common shapes of secrets (tokens, credentials in headers and addresses) and the name of
+  the home folder are hidden before sending. The hiding covers known shapes and is no guarantee.
+- A refused reply or report is tried again after 1 and 5 seconds. A message that still could not
+  be closed is tried again when the next run ends.
+- A reply for the same message is still accepted afterwards. A service that has shown the failure
+  decides what to do with it.
 - A transport without the `failure` hook only logs the event. Over MCP push there is no way back
   to the service, so nothing is sent.
 

@@ -5,6 +5,19 @@ and the project uses [Semantic Versioning](https://semver.org) once it reaches 1
 
 ## [Unreleased]
 
+### Fixed
+
+- The `reply` tool is now among the tools sent to the model (`loadMode: "essential"`). Before,
+  Oh My Pi left it out, so the model could not answer and the message waited for ever.
+- No message is left waiting. A run that ends without a `reply` call sends the final text of the
+  model as the reply (`replies.fromFinalText`, on by default), with secrets hidden. A stopped
+  turn, a closed or switched session and an answer the service refuses are reported as a
+  `failure`. Refused calls are tried again.
+
+### Changed
+
+- An aborted turn is now reported as a `failure`.
+
 ## [0.2.0] - 2026-11-27
 
 ### Added

@@ -8,9 +8,11 @@ export const MAX_REASON_LENGTH = 500;
 
 const HIDDEN = "[hidden]";
 
+/** A private key block, from its first line to its last one, or to the end of the text. */
+const KEY_BLOCK =
+  /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z0-9 ]*PRIVATE KEY-----|$)/g;
+
 const SECRET_SHAPES: ReadonlyArray<readonly [RegExp, string]> = [
-  // A private key block, from its first line.
-  [/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*$/g, HIDDEN],
   // The credentials of an address (scheme://user:password@host): the host stays.
   [/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/:@]*:[^\s/@]+@/gi, `$1${HIDDEN}@`],
   // The query of an address can carry keys.
@@ -45,28 +47,46 @@ const LONG_TOKEN = /[A-Za-z0-9_+=-]{32,}/g;
  * left. Secrets are hidden before the cut, so a cut never leaves part of one.
  */
 export function cleanReason(raw: string): string | undefined {
-  let text = oneLine(raw);
+  return cut(hideSecrets(oneLine(raw)), MAX_REASON_LENGTH);
+}
+
+/**
+ * The same hiding for a longer text that keeps its lines: the answer a model wrote without using
+ * the reply tool. At most `maxLength` characters. Undefined when nothing is left.
+ */
+export function cleanText(raw: string, maxLength: number): string | undefined {
+  return cut(hideSecrets(withoutControls(raw, "\n\t")).trim(), maxLength);
+}
+
+function hideSecrets(raw: string): string {
+  let text = raw.replace(KEY_BLOCK, HIDDEN);
   for (const [pattern, replacement] of SECRET_SHAPES) {
     text = text.replace(pattern, replacement);
   }
-  text = text.replace(LONG_TOKEN, (token) =>
+  return text.replace(LONG_TOKEN, (token) =>
     /[A-Z]/.test(token) && /[a-z]/.test(token) && /\d/.test(token) ? HIDDEN : token,
   );
+}
+
+function cut(text: string, maxLength: number): string | undefined {
   const symbols = [...text];
   if (symbols.length === 0) {
     return undefined;
   }
-  return symbols.length <= MAX_REASON_LENGTH
-    ? text
-    : `${symbols.slice(0, MAX_REASON_LENGTH - 1).join("")}…`;
+  return symbols.length <= maxLength ? text : `${symbols.slice(0, maxLength - 1).join("")}…`;
 }
 
 function oneLine(text: string): string {
+  return withoutControls(text, "").replace(/\s+/g, " ").trim();
+}
+
+/** Control characters become spaces, except those in `keep`. */
+function withoutControls(text: string, keep: string): string {
   let result = "";
   for (const symbol of text) {
     const code = symbol.codePointAt(0) ?? 0;
     const control = code < 32 || (code >= 127 && code <= 159) || code === 0x2028 || code === 0x2029;
-    result += control ? " " : symbol;
+    result += control && !keep.includes(symbol) ? " " : symbol;
   }
-  return result.replace(/\s+/g, " ").trim();
+  return result;
 }

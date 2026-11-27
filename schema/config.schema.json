@@ -149,6 +149,19 @@
       },
       "default": {}
     },
+    "replies": {
+      "description": "How a message gets its reply when the model does not use the reply tool.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fromFinalText": {
+          "description": "Send the final text of the model, with secrets hidden, as the reply.",
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "default": {}
+    },
     "adapterModule": {
       "description": "Path (relative to the working directory) of a JavaScript module whose default export implements ChannelAdapter. Replaces the HTTP service transport.",
       "type": "string",
