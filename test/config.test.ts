@@ -56,6 +56,21 @@ describe("loadConfig", () => {
     });
   });
 
+  it("shows no message context to the model by default", () => {
+    assert.deepEqual(loadConfig(sources({})).context, { include: [] });
+  });
+
+  it("reads the message context keys to show, and validates their names", () => {
+    const config = loadConfig(
+      sources({ [configPath]: JSON.stringify({ context: { include: ["route", "page_title"] } }) }),
+    );
+    assert.deepEqual(config.context, { include: ["route", "page_title"] });
+    assert.match(errorOf({ context: { include: ["Route"] } }), /invalid configuration/);
+    assert.match(errorOf({ context: { include: ["a-b"] } }), /invalid configuration/);
+    assert.match(errorOf({ context: { include: "route" } }), /invalid configuration/);
+    assert.match(errorOf({ context: { other: true } }), /unknown key/);
+  });
+
   it("sends the error text of a failed turn unless it is turned off", () => {
     assert.deepEqual(loadConfig(sources({})).failures, { includeReason: true });
     assert.deepEqual(loadConfig(sources({})).replies, { fromFinalText: true });

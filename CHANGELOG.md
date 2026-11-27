@@ -5,6 +5,10 @@ and the project uses [Semantic Versioning](https://semver.org) once it reaches 1
 
 ## [Unreleased]
 
+### Added
+
+- Message context: an optional `context` object of the message, shown to the model for the keys listed in `context.include`
+
 ## [0.3.0] - 2026-11-27
 
 ### Added

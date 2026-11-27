@@ -357,7 +357,7 @@ export class Dispatcher {
       attribution: event.attribution,
     };
     try {
-      await this.#options.session.send(formatForSession(event), options);
+      await this.#options.session.send(formatForSession(event, config.context.include), options);
     } catch (error) {
       this.#options.log(`message ${event.messageId} was not admitted (${errorName(error)})`);
       return "rejected";

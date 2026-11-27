@@ -92,6 +92,30 @@ describe("Dispatcher", () => {
     assert.equal(env.dispatcher.activeConversation, "c1");
   });
 
+  it("shows only the message context keys listed in context.include to the model", async () => {
+    const withInclude = loadConfig({
+      env: {},
+      cwd: "/",
+      readText: (path) =>
+        path === "/.omp/omp-channel.json"
+          ? JSON.stringify({ context: { include: ["route"] } })
+          : undefined,
+    });
+    const env = setup();
+    const dispatcher = new Dispatcher({
+      config: withInclude,
+      session: env.session,
+      adapter: env.adapter,
+      log: () => {},
+      now: () => new Date("2026-11-26T10:00:00Z"),
+      newId: () => "reply-1",
+    });
+    await dispatcher.submit(message("c1", "m1", { context: { route: "/x", title: "hidden" } }));
+    assert.equal(env.sent.length, 1);
+    assert.match(env.sent[0]?.content ?? "", /<channel-context route="\/x"><\/channel-context>/);
+    assert.equal((env.sent[0]?.content ?? "").includes("hidden"), false);
+  });
+
   it("uses the attribution set by the service when present", async () => {
     const env = setup();
     await env.dispatcher.submit(message("c1", "m1", { attribution: "user" }));

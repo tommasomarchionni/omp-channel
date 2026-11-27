@@ -46,6 +46,38 @@ describe("published JSON Schemas", () => {
     }
   });
 
+  it("accept and reject the message context the same way the parser does", () => {
+    const withContext = (context: unknown) => ({ ...validMessage, context });
+    const eight = Object.fromEntries(Array.from({ length: 8 }, (_, i) => [`k${i}`, "v"]));
+    const valid: unknown[] = [
+      withContext({ route: "/pricing", title: "Prices" }),
+      withContext({}),
+      withContext({ a1_b: "x".repeat(200) }),
+      withContext(eight),
+    ];
+    for (const item of valid) {
+      assert.equal(validateInbound(item), true, JSON.stringify(validateInbound.errors));
+      assert.equal(parseInboundEvent(item).ok, true, JSON.stringify(item));
+    }
+    const invalid: unknown[] = [
+      withContext({ ...eight, k8: "v" }),
+      withContext({ Route: "/x" }),
+      withContext({ "1route": "/x" }),
+      withContext({ route: 7 }),
+      withContext("route"),
+      withContext(["route"]),
+      { type: "interrupt", conversationId: "conv-1", context: {} },
+    ];
+    for (const item of invalid) {
+      assert.equal(validateInbound(item), false, JSON.stringify(item));
+      assert.equal(parseInboundEvent(item).ok, false, JSON.stringify(item));
+    }
+    // The schema describes what a sender must send; the parser cuts a longer value instead.
+    const long = withContext({ route: "x".repeat(201) });
+    assert.equal(validateInbound(long), false);
+    assert.equal(parseInboundEvent(long).ok, true);
+  });
+
   it("validate the failure report that is built, with and without a reason", () => {
     const report = { messageId: "f-1", at: new Date("2026-11-26T10:00:00.000Z") };
     const long = cleanReason("x ".repeat(MAX_REASON_LENGTH));

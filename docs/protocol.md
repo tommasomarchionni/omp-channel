@@ -58,16 +58,42 @@ are the defaults.
 
 ### 3.1 `message`
 
-| Field            | Required | Type and limits                                                              | Meaning                                                               |
-| ---------------- | -------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `type`           | yes      | `"message"`                                                                  |                                                                       |
-| `conversationId` | yes      | identifier                                                                   | The conversation the message belongs to (section 5).                  |
-| `messageId`      | yes      | identifier                                                                   | Unique id of this message. Used to reply and to deduplicate.          |
-| `sender`         | yes      | string, 1 to 64 characters after cleanup                                     | Display name. Control characters become spaces.                       |
-| `text`           | yes      | string, 1 to 4000 characters, no control characters except tab and line feed | The content.                                                          |
-| `sentAt`         | no       | ISO 8601 timestamp                                                           | Set by the service. Informational.                                    |
-| `replyTo`        | no       | identifier                                                                   | `messageId` of an earlier message this one answers. Informational.    |
-| `attribution`    | yes      | `"user"` or `"agent"`                                                        | Who wrote the message. Passed to Oh My Pi unchanged. See section 3.4. |
+| Field            | Required | Type and limits                                                                                                     | Meaning                                                                                              |
+| ---------------- | -------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `type`           | yes      | `"message"`                                                                                                         |                                                                                                      |
+| `conversationId` | yes      | identifier                                                                                                          | The conversation the message belongs to (section 5).                                                 |
+| `messageId`      | yes      | identifier                                                                                                          | Unique id of this message. Used to reply and to deduplicate.                                         |
+| `sender`         | yes      | string, 1 to 64 characters after cleanup                                                                            | Display name. Control characters become spaces.                                                      |
+| `text`           | yes      | string, 1 to 4000 characters, no control characters except tab and line feed                                        | The content.                                                                                         |
+| `sentAt`         | no       | ISO 8601 timestamp                                                                                                  | Set by the service. Informational.                                                                   |
+| `replyTo`        | no       | identifier                                                                                                          | `messageId` of an earlier message this one answers. Informational.                                   |
+| `attribution`    | yes      | `"user"` or `"agent"`                                                                                               | Who wrote the message. Passed to Oh My Pi unchanged. See section 3.4.                                |
+| `context`        | no       | object: at most 8 keys; each key matches `^[a-z][a-z0-9_]{0,31}$`; each value is a string of at most 200 characters | Extra facts about the message. Shown to the model only for the keys in `context.include`. See below. |
+
+**Context.** A service can send extra facts about a message (for example the page it was sent
+from) without a change to omp-channel. The rules are checked when the event is parsed, and a message
+that breaks one is rejected with the reason: more than 8 keys, a key that does not match the pattern,
+a value that is not a string, or a `context` that is not an object. Inside a value, control
+characters are removed (line feeds and tabs too), the value is trimmed, and a value still longer than
+200 characters is cut to 200 with a final ellipsis. A cut value is not an error. The schema asks senders
+for values of at most 200 characters, so a sender that sends a longer one is accepted by the parser
+but not by the schema.
+
+The configuration decides what reaches the model: `context.include` lists the keys to show (default
+`[]`, nothing is shown). A key that is listed and present is shown; a key that is not listed is
+dropped silently; a listed key that the message does not carry is skipped. When at least one key is
+shown, the message envelope gets a `channel-context` element before the body, with one attribute per
+shown key, in the order of `context.include`. Values are escaped for attribute context (`&`, `<`,
+`>`, `"`, `'`), so a value cannot close the element or the envelope. The body keeps its escaping, and
+the sentence that marks the content as data is unchanged. With no shown key, the text is the same as
+without `context`.
+
+```text
+<channel-message messageId="m-1">
+<channel-context route="/pricing" title="Prices"></channel-context>
+What does a listener pay?
+</channel-message>
+```
 
 ### 3.2 `interrupt`
 
