@@ -29,6 +29,27 @@ Oh My Pi needs **Bun 1.4.4 or later** at runtime. On 26/11/2026 the system Bun w
 | Agent status (`working`/`free`) reported to a service                         | not verified | needs a service; not part of the script                                                 |
 | Plain JSON Schema tool parameters accepted by Oh My Pi                        | not verified | see "Tool parameter schema" below                                                       |
 
+## Activity reports (27/11/2026)
+
+Oh My Pi 19.2.1 in RPC mode with this extension, an adapter module that takes `activity`, and a
+scripted model endpoint on the same machine (it asked for `read`, a failing `bash`, a slow `bash`
+and then `reply`). The `omp` process could reach loopback addresses only.
+
+| Check                                                           | Result                                    |
+| --------------------------------------------------------------- | ----------------------------------------- |
+| `message_start` and the tool events reach the extension         | pass                                      |
+| Each tool: `running`, then `done` or `failed`, before the reply | pass (3 tools)                            |
+| The `reply` tool is not reported                                | pass                                      |
+| No argument, result or file content in the reports              | pass for the values the script used       |
+| A command, a path and a token written in an intent              | replaced with `…`, `[path]`, `[hidden]`   |
+| RPC mode with default settings: no intents                      | observed: the lines are the tool names    |
+| RPC mode with `PI_INTENT_TRACING=1`: intents                    | pass                                      |
+| An adapter without the `activity` method                        | pass: the turn and the reply are the same |
+| Activity with a real model, in the terminal interface           | not verified                              |
+| Activity over the HTTP transport in a live session              | not verified (unit tests only)            |
+
+This run is not part of `npm run omp:e2e`.
+
 ## How to run the check
 
 Prerequisites: an `omp` command (Oh My Pi 19.2.1) on the PATH, Bun 1.4.4 or later on the PATH (or

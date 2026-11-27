@@ -19,6 +19,8 @@ export {
   parseReplyInput,
   type InboundEvent,
   type MessageEvent,
+  type ActivityState,
+  type OutboundActivity,
   type OutboundReply,
   type OutboundStatus,
 } from "./protocol.js";

@@ -45,6 +45,11 @@ export interface DispatcherOptions {
   readonly newId?: () => string;
   /** Waits between two attempts to deliver (tests replace it). */
   readonly wait?: (ms: number) => Promise<void>;
+  /**
+   * Called before a reply or a failure report leaves: what must reach the service first. Undefined
+   * when there is nothing to wait for. It must settle on its own in a short time.
+   */
+  readonly beforeOutcome?: () => Promise<void> | undefined;
 }
 
 export type ReplyResult = { ok: true } | { ok: false; reason: string };
@@ -94,6 +99,11 @@ export class Dispatcher {
     return this.#active;
   }
 
+  /** The conversation of a message that has no reply or report yet, undefined otherwise. */
+  conversationOfOpen(messageId: string): string | undefined {
+    return this.#isOpen(messageId) ? this.#conversationOf.get(messageId) : undefined;
+  }
+
   submit(event: InboundEvent, deliveryId?: string): Promise<AdmitOutcome> {
     if (this.#pending >= this.#options.config.limits.maxPending) {
       return Promise.resolve("dropped");
@@ -135,6 +145,7 @@ export class Dispatcher {
       messageId: this.#newId(),
       at: this.#now(),
     });
+    await this.#outcomeIsNext();
     try {
       await adapter.reply(reply);
       this.#answered.add(messageId);
@@ -264,6 +275,7 @@ export class Dispatcher {
       messageId: this.#newId(),
       at: this.#now(),
     });
+    await this.#outcomeIsNext();
     let failure = "unknown";
     for (const delay of delays) {
       await this.#wait(delay);
@@ -280,6 +292,13 @@ export class Dispatcher {
       }
     }
     this.#options.log(`failure was not reported (${failure})`);
+  }
+
+  async #outcomeIsNext(): Promise<void> {
+    const pending = this.#options.beforeOutcome?.();
+    if (pending !== undefined) {
+      await pending;
+    }
   }
 
   async #wait(ms: number): Promise<void> {

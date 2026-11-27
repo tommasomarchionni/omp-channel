@@ -95,7 +95,7 @@ function add(
 }
 
 /** The text parts of a message. Thinking and tool calls are not text. */
-function textsOf(content: unknown): string[] {
+export function textsOf(content: unknown): string[] {
   if (typeof content === "string") {
     return [content];
   }

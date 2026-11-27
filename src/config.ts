@@ -42,6 +42,11 @@ export interface RepliesConfig {
   readonly fromFinalText: boolean;
 }
 
+export interface ReportsConfig {
+  /** Tell the service which tools the agent uses for a message, when the adapter takes it. */
+  readonly activity: boolean;
+}
+
 export interface ChannelConfig {
   readonly mcpServer: string;
   readonly service: ServiceConfig | undefined;
@@ -51,6 +56,7 @@ export interface ChannelConfig {
   readonly delivery: DeliveryConfig;
   readonly failures: FailuresConfig;
   readonly replies: RepliesConfig;
+  readonly reports: ReportsConfig;
 }
 
 export interface ConfigSources {
@@ -105,6 +111,7 @@ export function loadConfig(sources: ConfigSources): ChannelConfig {
     delivery: { deliverAs: DeliveryConfig["deliverAs"] };
     failures: FailuresConfig;
     replies: RepliesConfig;
+    reports: ReportsConfig;
   };
 
   const service = parsed.service === undefined ? undefined : loadService(parsed.service, sources);
@@ -118,6 +125,7 @@ export function loadConfig(sources: ConfigSources): ChannelConfig {
     delivery: parsed.delivery,
     failures: parsed.failures,
     replies: parsed.replies,
+    reports: parsed.reports,
   };
 }
 
@@ -167,6 +175,8 @@ interface ServicePaths {
   replies: string;
   status: string;
   failures: string;
+  /** No default: without it no activity is sent over HTTP. */
+  activity?: string;
 }
 
 function loadService(

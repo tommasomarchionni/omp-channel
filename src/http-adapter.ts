@@ -3,6 +3,7 @@ import type { PollConfig, ServiceConfig } from "./config.js";
 import {
   type InboundEvent,
   type Limits,
+  type OutboundActivity,
   type OutboundFailure,
   type OutboundReply,
   type OutboundStatus,
@@ -25,7 +26,8 @@ const DELIVERY_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
  * - GET paths.messages returns { deliveries: [{ deliveryId, leaseExpiresAt, event }] } in order;
  * - POST paths.ack with { deliveryIds: [...] } after the agent admitted a delivery;
  * - POST paths.replies with a reply; POST paths.status with an agent status;
- * - POST paths.failures when a turn ended in an error and a message got no answer.
+ * - POST paths.failures when a turn ended in an error and a message got no answer;
+ * - POST paths.activity, only when that path is configured, with the tools being used.
  * A delivery that is not acknowledged before its lease ends is delivered again by the service.
  */
 export function createHttpAdapter(options: HttpAdapterOptions): ChannelAdapter {
@@ -114,7 +116,17 @@ export function createHttpAdapter(options: HttpAdapterOptions): ChannelAdapter {
     return deliveries;
   };
 
+  const activityPath = service.paths.activity;
+
   return {
+    ...(activityPath === undefined
+      ? {}
+      : {
+          async activity(activity: OutboundActivity): Promise<void> {
+            await request("POST", activityPath, activity, undefined);
+          },
+        }),
+
     async *receive(signal: AbortSignal): AsyncGenerator<Delivery> {
       let failures = 0;
       while (!signal.aborted) {

@@ -4,6 +4,7 @@ import type {
   ExtensionContext,
   ExtensionFactory,
 } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
+import { ActivityReports } from "./activity.js";
 import type { ChannelAdapter, Delivery } from "./adapter.js";
 import type { ChannelConfig } from "./config.js";
 import {
@@ -35,6 +36,7 @@ export interface ChannelExtensionOptions {
  * - the `reply` tool: the model answers a message by its messageId;
  * - lifecycle hooks: the agent state is reported, no message is left without an answer or a
  *   report when a run ends or the session goes away, and the adapter stops on shutdown;
+ * - tool hooks, when the adapter takes activity reports: which tools are used for a message;
  * - the adapter receive loop, when an adapter is given.
  */
 export function createChannelExtension(options: ChannelExtensionOptions): ExtensionFactory {
@@ -49,13 +51,29 @@ export function createChannelExtension(options: ChannelExtensionOptions): Extens
       abort: () => context?.abort(),
       isIdle: () => context?.isIdle() ?? true,
     };
+    // Assigned below: the two need each other.
+    let activity: ActivityReports | undefined;
     const dispatcher = new Dispatcher({
       config,
       session,
       adapter,
       log,
+      beforeOutcome: () => activity?.flush(),
       ...(options.wait === undefined ? {} : { wait: options.wait }),
     });
+    if (config.reports.activity && adapter?.activity !== undefined) {
+      const reports = new ActivityReports({
+        send: async (report) => adapter.activity?.(report),
+        conversationOfOpen: (messageId) => dispatcher.conversationOfOpen(messageId),
+        ignored: new Set([REPLY_TOOL_NAME]),
+        log,
+      });
+      // The handlers only note the event: Oh My Pi waits for them.
+      pi.on("message_start", (event) => reports.heard(event.message));
+      pi.on("tool_execution_start", (event) => reports.started(event));
+      pi.on("tool_execution_end", (event) => reports.ended(event));
+      activity = reports;
+    }
     // Counts the runs, so the end of an old one never marks free a newer one.
     let runs = 0;
 
@@ -104,6 +122,7 @@ export function createChannelExtension(options: ChannelExtensionOptions): Extens
     // A new, resumed or forked session no longer holds the messages that were waiting.
     pi.on("session_switch", async (_event, ctx) => {
       context = ctx;
+      activity?.reset();
       await dispatcher.abandon(SWITCHED_REASON);
     });
 

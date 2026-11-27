@@ -88,6 +88,26 @@ export interface OutboundFailure {
   readonly at: string;
 }
 
+export type ActivityState = "running" | "done" | "failed";
+
+/**
+ * A tool the agent is using for a message (`running`), or how that use ended. `text` is the tool
+ * name and the intent of the call, cleaned: never its arguments or its result.
+ */
+export interface OutboundActivity {
+  readonly type: "activity";
+  readonly conversationId: string;
+  /** Unique id of this report, so a retried POST can be recognized. */
+  readonly messageId: string;
+  /** The inbound message the agent is working on. */
+  readonly replyTo: string;
+  /** The same for every report about one use of a tool. */
+  readonly activityId: string;
+  readonly state: ActivityState;
+  readonly text: string;
+  readonly at: string;
+}
+
 export type ParseResult<T> = { ok: true; value: T } | { ok: false; reason: string };
 
 const ID_PATTERN = /^[A-Za-z0-9._:-]+$/;
@@ -246,6 +266,24 @@ export function buildFailure(
     messageId: report.messageId,
     replyTo,
     ...(reason === undefined ? {} : { reason }),
+    at: report.at.toISOString(),
+  };
+}
+
+export function buildActivity(
+  conversationId: string,
+  replyTo: string,
+  activity: { activityId: string; state: ActivityState; text: string },
+  report: { messageId: string; at: Date },
+): OutboundActivity {
+  return {
+    type: "activity",
+    conversationId,
+    messageId: report.messageId,
+    replyTo,
+    activityId: activity.activityId,
+    state: activity.state,
+    text: activity.text,
     at: report.at.toISOString(),
   };
 }
