@@ -28,6 +28,11 @@ export default {
   async status() {
     // Optional: a real adapter would forward the agent state to the service.
   },
+
+  async failure(report) {
+    // Optional: a message got no answer. A real adapter tells the person, with report.reason.
+    console.error(`no answer for ${report.replyTo}`);
+  },
 };
 
 // Helper for local experiments: call from another module in the same process.

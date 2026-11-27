@@ -19,7 +19,7 @@ export interface ServiceConfig {
   readonly url: URL;
   readonly key: string;
   readonly requestTimeoutMs: number;
-  readonly paths: { messages: string; ack: string; replies: string; status: string };
+  readonly paths: ServicePaths;
 }
 
 export interface PollConfig {
@@ -32,6 +32,11 @@ export interface DeliveryConfig {
   readonly deliverAs: "steer" | "followUp" | "aside";
 }
 
+export interface FailuresConfig {
+  /** Whether the cleaned error text is sent with a failure report. */
+  readonly includeReason: boolean;
+}
+
 export interface ChannelConfig {
   readonly mcpServer: string;
   readonly service: ServiceConfig | undefined;
@@ -39,6 +44,7 @@ export interface ChannelConfig {
   readonly poll: PollConfig;
   readonly limits: Limits & { maxPending: number };
   readonly delivery: DeliveryConfig;
+  readonly failures: FailuresConfig;
 }
 
 export interface ConfigSources {
@@ -91,6 +97,7 @@ export function loadConfig(sources: ConfigSources): ChannelConfig {
     poll: { intervalMs: number; maxBackoffMs: number; batchSize: number };
     limits: { maxTextLength: number; maxSenderLength: number; maxPending: number };
     delivery: { deliverAs: DeliveryConfig["deliverAs"] };
+    failures: FailuresConfig;
   };
 
   const service = parsed.service === undefined ? undefined : loadService(parsed.service, sources);
@@ -102,6 +109,7 @@ export function loadConfig(sources: ConfigSources): ChannelConfig {
     poll: parsed.poll,
     limits: parsed.limits,
     delivery: parsed.delivery,
+    failures: parsed.failures,
   };
 }
 
@@ -150,6 +158,7 @@ interface ServicePaths {
   ack: string;
   replies: string;
   status: string;
+  failures: string;
 }
 
 function loadService(

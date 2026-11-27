@@ -5,6 +5,18 @@ and the project uses [Semantic Versioning](https://semver.org) once it reaches 1
 
 ## [Unreleased]
 
+### Added
+
+- Failed turn report: when a run ends in a model error, each message it left unanswered is
+  reported to the service (`failure` event, `ChannelAdapter.failure`, `service.paths.failures`,
+  `schema/failure.schema.json`). `failures.includeReason` controls the error text, which is
+  cleaned of known secret shapes.
+
+### Fixed
+
+- The state stays `working` while Oh My Pi retries a request, instead of turning `free` between
+  attempts.
+
 ## [0.1.0] - 2026-11-27
 
 ### Changed

@@ -225,3 +225,18 @@ Run in a scratch home, not in the maintainer's Oh My Pi configuration:
 
 Not checked here: a session with a configuration file and a live service after the registry
 install. The checks above that use `-e` still describe the clone setup.
+
+## Failed turn (27/11/2026, Oh My Pi 19.2.1)
+
+Method: a small OpenAI-compatible endpoint on loopback that refuses every model request, selected
+with `LLAMA_CPP_BASE_URL`; `omp --mode rpc` with the built extension and a test adapter module
+that yields one message and records the calls. No real model ran.
+
+| Case                        | Result | Observed                                                                                                      |
+| --------------------------- | ------ | ------------------------------------------------------------------------------------------------------------- |
+| refused request (404)       | pass   | one `agent_end` with `stopReason: "error"`; one `failure` call with the message id and the error, then `free` |
+| retried request (503), 40 s | pass   | `agent_end` with `willContinue: true` after each attempt; the state stayed `working`, no `failure` call       |
+
+Not verified: the report after Oh My Pi gives up on a retried request (the run was stopped during
+the retries; unit tests cover the logic), the interactive terminal interface (RPC mode only), and
+the `failure` call of the HTTP transport against a real service.

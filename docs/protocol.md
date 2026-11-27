@@ -18,6 +18,7 @@ The machine-readable schemas are in [`schema/`](https://github.com/tommasomarchi
 | `inbound-event.schema.json`  | events the service sends to the agent (`message`, `interrupt`, `close`) |
 | `outbound-reply.schema.json` | a reply the agent posts to the service                                  |
 | `status.schema.json`         | agent state the agent reports to the service                            |
+| `failure.schema.json`        | a turn that ended in an error and left a message unanswered             |
 | `config.schema.json`         | the omp-channel configuration file                                      |
 
 The TypeScript module `src/protocol.ts` implements the same rules. Both must change together.
@@ -128,6 +129,7 @@ Paths are relative to `service.url` and configurable in `service.paths`. Default
 | Acknowledge | `POST /messages/ack`    | `{ "deliveryIds": ["d1"] }` |
 | Reply       | `POST /replies`         | outbound reply (section 7)  |
 | Status      | `POST /status`          | agent status (section 8)    |
+| Failure     | `POST /failures`        | failed turn (section 9)     |
 
 All calls carry `Authorization: Bearer <key>`. A non-2xx answer is an error. The key is never
 included in a log line, an error message or a tool result.
@@ -213,6 +215,7 @@ interface ChannelAdapter {
   reply(reply: OutboundReply): Promise<void>; // required
   ack?(deliveryId: string): Promise<void>; // after admission
   status?(status: OutboundStatus): Promise<void>; // best effort
+  failure?(failure: OutboundFailure): Promise<void>; // a message got no answer (section 9)
   interrupt?(conversationId: string): Promise<void>; // after an interrupt is applied
   close?(conversationId: string): Promise<void>; // after a close is applied
   describe?(): Promise<string> | string; // plain-text state for the /channel-status command
@@ -258,17 +261,53 @@ message text. A `describe` that throws is reported as one line; its error text i
 }
 ```
 
-`status` is `working` when a turn starts and `free` when it ends, for the open conversation.
-Status is best effort: a failed report is logged and not retried. Status is not part of the
-acknowledgement logic.
+`status` is `working` when a turn starts and `free` when it ends, for the open conversation. A run
+that Oh My Pi continues on its own (a retry of a model request, for example) has not ended: the
+state stays `working`. Status is best effort: a failed report is logged and not retried. Status is
+not part of the acknowledgement logic.
 
-## 9. Activity (optional, not emitted in version 1)
+## 9. Failed turn (agent to service)
+
+A turn can end in an error, for example because the model provider refuses the request. The agent
+then answers nothing, so the service is told:
+
+```json
+{
+  "type": "failure",
+  "conversationId": "c1",
+  "messageId": "f-41c0b9e2",
+  "replyTo": "m1",
+  "reason": "404 The model is downloaded but not loaded",
+  "at": "2026-11-26T10:00:00.000Z"
+}
+```
+
+- One report for each unanswered message: `replyTo` is its `messageId`. `messageId` is generated
+  by the agent for each report.
+- Sent only when the run is over. Oh My Pi retries some errors by itself; while it does, nothing is
+  reported.
+- Only a model error is reported. An aborted turn (an interrupt from the service, or from the
+  person at the terminal) is not.
+- A message that already got a reply is never reported. The failed turn blames only the messages
+  it took after the last completed answer.
+- `reason` is optional text for a person: one line, at most 500 characters. Common shapes of
+  secrets (tokens, credentials in headers and addresses) and the name of the home folder are
+  hidden before it is sent. The hiding covers known shapes and is no guarantee: set
+  `failures.includeReason` to `false` to send no text at all.
+- The report is best effort. A refused report is logged and sent again only if a later turn fails
+  for the same message.
+- A reply for the same message is still accepted afterwards, for example when a later turn
+  succeeds. A service that has shown the failure decides what to do with it.
+- A transport without the `failure` hook only logs the event. Over MCP push there is no way back
+  to the service, so nothing is sent.
+
+## 10. Activity (optional, not emitted in version 1)
 
 The protocol reserves an optional `activity` report (for example, a tool started or finished)
 for showing progress to the service. Version 1 of omp-channel does not emit it. A service must
 not require it.
 
-## 10. Security rules
+## 11. Security rules
 
 - The service key is read from an environment variable named in the configuration
   (`service.keyEnv`), or from a file named by `<keyEnv>_FILE`. It is never written in the
@@ -279,14 +318,15 @@ not require it.
 - Inbound text is data from an outside party. It is handed to the model inside an envelope that
   says so, and angle brackets are escaped so the text cannot close the envelope.
 - Inbound events are validated before use. Unknown fields and out-of-range values are rejected.
+- The error text of a failed turn is cleaned of known secret shapes before it is sent (section 9).
 
-## 11. Versioning
+## 12. Versioning
 
 `PROTOCOL_VERSION` is `1`. Version 1 is alpha: fields may still change before the first stable
 release, and each change is recorded in CHANGELOG.md. A future incompatible change will use a
 new version number.
 
-## 12. Not in this contract
+## 13. Not in this contract
 
 - Delivery of messages from the agent to a person without a reply to a message.
 - Attachments and other non-text content.

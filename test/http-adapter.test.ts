@@ -178,6 +178,21 @@ describe("HTTP transport", () => {
     assert.equal(((service.calls[0]?.body ?? {}) as { replyTo: string }).replyTo, "m1");
   });
 
+  it("posts the report of a failed turn to its path", async () => {
+    const service = fakeService(() => new Response(null, { status: 204 }));
+    const report = {
+      type: "failure",
+      conversationId: "c1",
+      messageId: "f1",
+      replyTo: "m1",
+      reason: "404 not loaded",
+      at: "2026-11-26T10:00:00.000Z",
+    } as const;
+    await adapterWith(service.fetchFn).failure?.(report);
+    assert.equal(service.calls[0]?.url, "https://chat.example.com/api/failures");
+    assert.deepEqual(service.calls[0]?.body, report);
+  });
+
   it("reports HTTP failures by status only, without the key or the body", async () => {
     const service = fakeService(() => new Response(`echo ${SECRET}`, { status: 503 }));
     const adapter = adapterWith(service.fetchFn);

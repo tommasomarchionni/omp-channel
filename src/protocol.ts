@@ -73,6 +73,21 @@ export interface OutboundStatus {
   readonly at: string;
 }
 
+/**
+ * A turn ended in an error and a message got no answer. `reason` is the cleaned error text, absent
+ * when it is turned off or there is none.
+ */
+export interface OutboundFailure {
+  readonly type: "failure";
+  readonly conversationId: string;
+  /** Unique id of this report, so a retried POST can be recognized. */
+  readonly messageId: string;
+  /** The inbound message that got no answer. */
+  readonly replyTo: string;
+  readonly reason?: string;
+  readonly at: string;
+}
+
 export type ParseResult<T> = { ok: true; value: T } | { ok: false; reason: string };
 
 const ID_PATTERN = /^[A-Za-z0-9._:-]+$/;
@@ -219,8 +234,33 @@ export function buildReply(
   };
 }
 
+export function buildFailure(
+  conversationId: string,
+  replyTo: string,
+  reason: string | undefined,
+  report: { messageId: string; at: Date },
+): OutboundFailure {
+  return {
+    type: "failure",
+    conversationId,
+    messageId: report.messageId,
+    replyTo,
+    ...(reason === undefined ? {} : { reason }),
+    at: report.at.toISOString(),
+  };
+}
+
 export function buildStatus(conversationId: string, status: AgentStatus, at: Date): OutboundStatus {
   return { type: "status", conversationId, status, at: at.toISOString() };
+}
+
+const ENVELOPE = /<channel-message messageId="([A-Za-z0-9._:-]{1,128})">/g;
+
+/** The message ids of the envelopes in a text handed to the agent (see `formatForSession`). */
+export function messageIdsIn(text: string): string[] {
+  return [...text.matchAll(ENVELOPE)].flatMap((match) =>
+    match[1] === undefined ? [] : [match[1]],
+  );
 }
 
 /**
