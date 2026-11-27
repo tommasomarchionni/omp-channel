@@ -4,6 +4,7 @@ import type { ChannelAdapter } from "../src/adapter.js";
 import { loadConfig } from "../src/config.js";
 import { createChannelExtension, REPLY_TOOL_NAME } from "../src/extension.js";
 import type { OutboundFailure, OutboundStatus } from "../src/protocol.js";
+import { NO_REPLY_REASON } from "../src/turn.js";
 import { fakeContext, fakePi, flush } from "./helpers.js";
 
 const config = loadConfig({ env: {}, cwd: "/", readText: () => undefined });
@@ -65,7 +66,9 @@ async function start(adapter: ChannelAdapter, settings = config) {
           role: "assistant",
           stopReason,
           content: [],
-          errorMessage: "404 not loaded, key sk-abc123def456ghi789",
+          ...(stopReason === "error"
+            ? { errorMessage: "404 not loaded, key sk-abc123def456ghi789" }
+            : {}),
         },
       ],
     });
@@ -73,6 +76,36 @@ async function start(adapter: ChannelAdapter, settings = config) {
   };
   return { pi, logs, end };
 }
+
+describe("a turn that ends without a reply", () => {
+  it("reports the message, so the service does not wait for ever", async () => {
+    const service = adapterWith();
+    const { end } = await start(service.adapter);
+    await end("stop");
+    assert.equal(service.failures.length, 1);
+    assert.equal(service.failures[0]?.replyTo, "m1");
+    assert.equal(service.failures[0]?.reason, NO_REPLY_REASON);
+  });
+
+  it("reports nothing when the model used the reply tool", async () => {
+    const service = adapterWith();
+    const { pi, end } = await start(service.adapter);
+    await pi
+      .tool(REPLY_TOOL_NAME)
+      .execute("t1", { messageId: "m1", text: "done" }, undefined, undefined, fakeContext());
+    await end("stop");
+    assert.deepEqual(service.failures, []);
+  });
+});
+
+describe("the reply tool", () => {
+  it("is always among the tools sent to the model", async () => {
+    const service = adapterWith();
+    const { pi } = await start(service.adapter);
+    // Oh My Pi leaves an extension tool out of the model's tools unless it says it is essential.
+    assert.equal(pi.tool(REPLY_TOOL_NAME).loadMode, "essential");
+  });
+});
 
 describe("a turn that ends in an error", () => {
   it("reports the unanswered message once, with the secret hidden, and frees the state", async () => {

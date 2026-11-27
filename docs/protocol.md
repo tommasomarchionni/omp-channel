@@ -268,8 +268,9 @@ not part of the acknowledgement logic.
 
 ## 9. Failed turn (agent to service)
 
-A turn can end in an error, for example because the model provider refuses the request. The agent
-then answers nothing, so the service is told:
+A turn can end without a reply: with an error, for example because the model provider refuses the
+request, or normally, when the model answers at the terminal and never calls the `reply` tool. In
+both cases the service is told:
 
 ```json
 {
@@ -284,12 +285,14 @@ then answers nothing, so the service is told:
 
 - One report for each unanswered message: `replyTo` is its `messageId`. `messageId` is generated
   by the agent for each report.
-- Sent only when the run is over. Oh My Pi retries some errors by itself; while it does, nothing is
+- Sent only when the run is over. Oh My Pi retries some errors by itself, and background work can
+  continue a run; while either happens, nothing is reported.
+- A run that ended normally carries the reason `The agent finished without sending a reply`. The
+  text the model wrote at the terminal is not sent: only the `reply` tool sends text.
+- An aborted turn (an interrupt from the service, or from the person at the terminal) is not
   reported.
-- Only a model error is reported. An aborted turn (an interrupt from the service, or from the
-  person at the terminal) is not.
-- A message that already got a reply is never reported. The failed turn blames only the messages
-  it took after the last completed answer.
+- A message that already got a reply is never reported. A run blames only the messages it took
+  after the previous completed answer.
 - `reason` is optional text for a person: one line, at most 500 characters. Common shapes of
   secrets (tokens, credentials in headers and addresses) and the name of the home folder are
   hidden before it is sent. The hiding covers known shapes and is no guarantee: set

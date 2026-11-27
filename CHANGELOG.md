@@ -5,6 +5,12 @@ and the project uses [Semantic Versioning](https://semver.org) once it reaches 1
 
 ## [Unreleased]
 
+### Fixed
+
+- The `reply` tool is now among the tools sent to the model (`loadMode: "essential"`). Before,
+  Oh My Pi left it out, so the model could not answer and the message waited for ever.
+- A run that ends normally without a reply to a message is reported as a `failure`.
+
 ## [0.2.0] - 2026-11-27
 
 ### Added

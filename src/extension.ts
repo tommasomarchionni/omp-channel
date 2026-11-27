@@ -93,6 +93,8 @@ export function createChannelExtension(options: ChannelExtensionOptions): Extens
     pi.registerTool({
       name: REPLY_TOOL_NAME,
       label: "Reply to service",
+      // Without this Oh My Pi leaves an extension tool out of the tools it sends to the model.
+      loadMode: "essential",
       description:
         "Send a reply to an external message. Pass the messageId shown with that message. Only messageIds received in this session are accepted.",
       parameters: jsonSchemaParameters({

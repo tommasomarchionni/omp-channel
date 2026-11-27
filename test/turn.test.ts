@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { formatForSession, type MessageEvent } from "../src/protocol.js";
-import { failedRun } from "../src/turn.js";
+import { failedRun, NO_REPLY_REASON } from "../src/turn.js";
 
 const message = (messageId: string, text = "hello"): MessageEvent => ({
   type: "message",
@@ -34,8 +34,19 @@ describe("failedRun", () => {
     assert.equal(failedRun({ willContinue: true, messages }), undefined);
   });
 
-  it("says nothing for an answer, an abort or a run without a channel message", () => {
-    assert.equal(failedRun({ messages: [user("m1"), assistant("stop")] }), undefined);
+  it("names the channel message of a run that ended without any error", () => {
+    for (const stopReason of ["stop", "length"]) {
+      const ended = failedRun({ messages: [user("m1"), assistant(stopReason)] });
+      assert.deepEqual(ended, { reason: NO_REPLY_REASON, messageIds: ["m1"] });
+    }
+  });
+
+  it("waits when the run ended but background work will continue it", () => {
+    const messages = [user("m1"), assistant("stop")];
+    assert.equal(failedRun({ awaitingAsyncWork: true, messages }), undefined);
+  });
+
+  it("says nothing for an abort or a run without a channel message", () => {
     assert.equal(failedRun({ messages: [user("m1"), assistant("aborted")] }), undefined);
     const typed = { role: "user", content: [{ type: "text", text: "typed at the terminal" }] };
     assert.equal(failedRun({ messages: [typed, assistant("error", "x")] }), undefined);

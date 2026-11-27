@@ -1,5 +1,4 @@
 ---
-
 title: Verification in Oh My Pi
 description: What was verified in a real Oh My Pi session, and what was not.
 ---
@@ -240,3 +239,17 @@ that yields one message and records the calls. No real model ran.
 Not verified: the report after Oh My Pi gives up on a retried request (the run was stopped during
 the retries; unit tests cover the logic), the interactive terminal interface (RPC mode only), and
 the `failure` call of the HTTP transport against a real service.
+
+## Reply tool (27/11/2026, Oh My Pi 19.2.1, RPC mode)
+
+Method: a loopback endpoint that records the tools of each model request, then one run with a local
+model; a test adapter module and a stand-in service.
+
+| Case                           | Result | Observed                                                                |
+| ------------------------------ | ------ | ----------------------------------------------------------------------- |
+| tools sent to the model, 0.2.0 | fail   | built-in tools only: `reply` was missing (extension tools are deferred) |
+| tools sent to the model, fixed | pass   | `reply` is listed with the built-in tools                               |
+| local model answers a message  | pass   | the model called `reply`; the service received the text, then `free`    |
+
+Not verified: a real model that ends without calling `reply` (unit tests cover the report), and the
+interactive terminal interface.

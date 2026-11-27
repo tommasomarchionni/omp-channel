@@ -7,23 +7,32 @@ import { messageIdsIn } from "./protocol.js";
 export interface RunEnd {
   /** True when Oh My Pi continues the run on its own (a retry, for example). */
   readonly willContinue?: boolean | undefined;
+  /** True when background work that will continue the run is still going. */
+  readonly awaitingAsyncWork?: boolean | undefined;
   /** The session messages when the run ended. */
   readonly messages?: readonly unknown[] | undefined;
 }
 
+/** What the service is told when a run ends normally and a message got no reply. */
+export const NO_REPLY_REASON = "The agent finished without sending a reply";
+
 export interface FailedRun {
-  /** The error the model provider reported, as it came. Clean it before it leaves the machine. */
+  /**
+   * The error the model provider reported, as it came (clean it before it leaves the machine), or
+   * `NO_REPLY_REASON` for a run that ended normally.
+   */
   readonly reason: string | undefined;
   /** Ids of the channel messages the failed work was answering, oldest first. */
   readonly messageIds: readonly string[];
 }
 
 /**
- * The failure of a run that ended in a model error, or undefined for every other end: a run that
- * goes on, a normal answer, an abort, or a run without any channel message.
+ * The messages a finished run may have left without a reply: it ended in a model error, or it
+ * ended normally. Undefined for a run that goes on (a retry, background work), an abort, or a run
+ * without any channel message. The caller drops the messages that did get a reply.
  *
- * The messages looked at are those after the last completed answer: an older message that the
- * model finished with is not blamed for a later error.
+ * The messages looked at are those after the previous completed answer: an older message that the
+ * model finished with is not blamed for a later end.
  */
 export function failedRun(end: RunEnd): FailedRun | undefined {
   if (end.willContinue === true) {
@@ -35,7 +44,9 @@ export function failedRun(end: RunEnd): FailedRun | undefined {
     last -= 1;
   }
   const failed = messages[last];
-  if (failed === undefined || failed.stopReason !== "error") {
+  const errored = failed?.stopReason === "error";
+  const completed = isCompleted(failed?.stopReason) && end.awaitingAsyncWork !== true;
+  if (failed === undefined || (!errored && !completed)) {
     return undefined;
   }
   const ids: string[] = [];
@@ -45,7 +56,7 @@ export function failedRun(end: RunEnd): FailedRun | undefined {
       continue;
     }
     if (message.role === "assistant") {
-      if (message.stopReason === "stop" || message.stopReason === "length") {
+      if (isCompleted(message.stopReason)) {
         break;
       }
       continue;
@@ -57,10 +68,12 @@ export function failedRun(end: RunEnd): FailedRun | undefined {
   if (ids.length === 0) {
     return undefined;
   }
-  return {
-    reason: typeof failed.errorMessage === "string" ? failed.errorMessage : undefined,
-    messageIds: [...new Set(ids)],
-  };
+  const error = typeof failed.errorMessage === "string" ? failed.errorMessage : undefined;
+  return { reason: errored ? error : NO_REPLY_REASON, messageIds: [...new Set(ids)] };
+}
+
+function isCompleted(stopReason: unknown): boolean {
+  return stopReason === "stop" || stopReason === "length";
 }
 
 function textsOf(content: unknown): string[] {
