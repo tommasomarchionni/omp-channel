@@ -1,3 +1,9 @@
+---
+
+title: Integration protocol
+description: The public contract between a service and an Oh My Pi agent session.
+---
+
 # Integration protocol (version 1)
 
 This document is the public contract between an external **service** (any system that exchanges
@@ -5,7 +11,7 @@ messages with a person or with another agent) and an agent
 session of [Oh My Pi](https://github.com/can1357/oh-my-pi) running omp-channel. Any service can
 implement it. The contract is independent of any product.
 
-The machine-readable schemas are in [`schema/`](../schema):
+The machine-readable schemas are in [`schema/`](https://github.com/tommasomarchionni/omp-channel/tree/main/schema):
 
 | File                         | Describes                                                               |
 | ---------------------------- | ----------------------------------------------------------------------- |
@@ -244,7 +250,12 @@ message text. A `describe` that throws is reported as one line; its error text i
 ## 8. Agent status (agent to service)
 
 ```json
-{ "type": "status", "conversationId": "c1", "status": "working", "at": "2026-11-26T10:00:00.000Z" }
+{
+  "type": "status",
+  "conversationId": "c1",
+  "status": "working",
+  "at": "2026-11-26T10:00:00.000Z"
+}
 ```
 
 `status` is `working` when a turn starts and `free` when it ends, for the open conversation.
