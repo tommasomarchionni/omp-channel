@@ -67,6 +67,11 @@
               "type": "string",
               "pattern": "^/",
               "default": "/failures"
+            },
+            "activity": {
+              "description": "Where activity reports are posted. No default: without it none are sent.",
+              "type": "string",
+              "pattern": "^/"
             }
           },
           "default": {}
@@ -156,6 +161,19 @@
       "properties": {
         "fromFinalText": {
           "description": "Send the final text of the model, with secrets hidden, as the reply.",
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "default": {}
+    },
+    "reports": {
+      "description": "Optional reports about the work on a message.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "activity": {
+          "description": "Report the tools used for a message (name and intent, never arguments or results), when the transport takes it.",
           "type": "boolean",
           "default": true
         }

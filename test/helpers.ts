@@ -6,12 +6,27 @@ import type {
 } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
 import type { SendUserMessageOptions } from "@oh-my-pi/pi-coding-agent/session/agent-session-types";
 
-/** Lifecycle events used by the fake API. Only the event type is needed. */
+/** Lifecycle events used by the fake API. Only the fields a test needs. */
 export interface LifecycleEvent {
-  type: "session_start" | "session_switch" | "agent_start" | "agent_end" | "session_shutdown";
+  type:
+    | "session_start"
+    | "session_switch"
+    | "agent_start"
+    | "agent_end"
+    | "session_shutdown"
+    | "message_start"
+    | "tool_execution_start"
+    | "tool_execution_end";
   willContinue?: boolean;
   awaitingAsyncWork?: boolean;
   messages?: unknown[];
+  message?: unknown;
+  toolCallId?: string;
+  toolName?: string;
+  args?: unknown;
+  intent?: string;
+  result?: unknown;
+  isError?: boolean;
 }
 
 export interface SentPrompt {
@@ -91,6 +106,8 @@ export function fakePi(sendMode: "accept" | "hold" | "reject" = "accept") {
         handler({ type: name, ...data }, ctx);
       }
     },
+    /** True when the extension registered a handler for this event. */
+    listensTo: (name: LifecycleEvent["type"]) => lifecycleHandlers.has(name),
     command(name: string) {
       const command = commands.get(name);
       if (command === undefined) {

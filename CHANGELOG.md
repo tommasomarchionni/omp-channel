@@ -5,6 +5,15 @@ and the project uses [Semantic Versioning](https://semver.org) once it reaches 1
 
 ## [Unreleased]
 
+### Added
+
+- Activity reports: for each tool used for a message, a report when it starts and one when it ends
+  (`activity` event, `ChannelAdapter.activity`, `service.paths.activity`,
+  `schema/activity.schema.json`). A report carries the tool name and the stated intent, never
+  commands, paths, arguments or results. They are sent when the transport takes them;
+  `reports.activity: false` turns them off. Oh My Pi asks the model for intents in the interactive
+  terminal interface by default, so other modes report mostly tool names.
+
 ## [0.2.1] - 2026-11-27
 
 ### Fixed

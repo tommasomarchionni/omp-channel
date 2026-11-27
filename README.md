@@ -44,7 +44,8 @@ and the model; omp-channel is the link between them.
    the agent is busy. The text is marked as data from an outside party.
 3. The agent answers with the `reply` tool, using the `messageId` of the message. omp-channel posts
    the reply to the service.
-4. While a turn runs, omp-channel reports `working` to the service; when the turn ends, `free`.
+4. While a turn runs, omp-channel reports `working` to the service; when the turn ends, `free`. A
+   service that takes activity reports also learns which tools the agent is using.
 5. Delivery is at least once with acknowledgements, so a message is neither lost nor handled
    twice when the extension restarts. Details are in [docs/protocol.md](docs/protocol.md).
 
@@ -214,6 +215,7 @@ the extension and writes the reason (with its path) to stderr.
 | `service.keyEnv`           | `"OMP_CHANNEL_KEY"`                                              | Environment variable holding the key (`<keyEnv>_FILE` for a file). Required with `service.url`. |
 | `service.requestTimeoutMs` | `10000`                                                          | Timeout of each request.                                                                        |
 | `service.paths.*`          | `/messages`, `/messages/ack`, `/replies`, `/status`, `/failures` | Endpoint paths.                                                                                 |
+| `service.paths.activity`   | none                                                             | Where activity reports are posted. Without it none are sent over HTTP.                          |
 | `poll.intervalMs`          | `2000`                                                           | Wait between polls when the queue is empty.                                                     |
 | `poll.maxBackoffMs`        | `30000`                                                          | Longest wait after failed polls.                                                                |
 | `poll.batchSize`           | `10`                                                             | Deliveries requested per poll.                                                                  |
@@ -223,6 +225,7 @@ the extension and writes the reason (with its path) to stderr.
 | `delivery.deliverAs`       | `"followUp"`                                                     | How a message is queued in Oh My Pi: `steer`, `followUp` or `aside`.                            |
 | `failures.includeReason`   | `true`                                                           | Send the cleaned error text when a turn fails and leaves a message unanswered.                  |
 | `replies.fromFinalText`    | `true`                                                           | Send the cleaned final text of the model as the reply when it did not use the `reply` tool.     |
+| `reports.activity`         | `true`                                                           | Report the tools used for a message, when the transport takes it (docs/protocol.md 10).         |
 | `adapterModule`            | none                                                             | Path to a module that exports a `ChannelAdapter`. Replaces the HTTP transport.                  |
 
 Environment variables:
@@ -246,6 +249,10 @@ Environment variables:
   addresses, for local tests.
 - **Replies are limited.** The `reply` tool accepts only a `messageId` that was delivered in the
   current session.
+- **Activity says little.** An activity report holds the tool name and the stated intent, never
+  commands, arguments or results as such. Secrets, paths, addresses and quoted argument values are
+  taken out of the intent; it is still text written by the model. See
+  [docs/protocol.md](docs/protocol.md), section 10, or set `reports.activity: false`.
 - **Error text is cleaned.** When a turn fails, the error from the model provider is sent with
   known secret shapes and the home folder name hidden. `failures.includeReason: false` keeps it on
   the machine.
@@ -274,6 +281,8 @@ Report vulnerabilities privately, as described in [SECURITY.md](SECURITY.md).
 - **Verified in a live Oh My Pi session (19.2.1, local model):** startup, delivery of a pushed
   message to an idle session, a message pushed during a turn (taken at a turn boundary, see
   [docs/protocol.md](docs/protocol.md) section 3.5), abort, and the report of a refused model request.
+- **Activity reports** were checked in a live session in RPC mode with a scripted model; not yet
+  with a real model or in the terminal interface.
 - **Not verified yet:** the status report (`working`/`free`) to a service, and the effect of each
   `attribution` value. See [docs/omp-verification.md](docs/omp-verification.md).
 - `npm ci` also installs the Oh My Pi package for type checking; it is large.

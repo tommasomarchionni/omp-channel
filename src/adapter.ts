@@ -1,4 +1,10 @@
-import type { InboundEvent, OutboundFailure, OutboundReply, OutboundStatus } from "./protocol.js";
+import type {
+  InboundEvent,
+  OutboundActivity,
+  OutboundFailure,
+  OutboundReply,
+  OutboundStatus,
+} from "./protocol.js";
 
 /** One event from a service, with the lease id that the service uses for acknowledgement. */
 export interface Delivery {
@@ -28,6 +34,11 @@ export interface ChannelAdapter {
    * service learns nothing and the message stays unanswered. Throws when it is not accepted.
    */
   failure?(failure: OutboundFailure): Promise<void>;
+  /**
+   * Reports a tool the agent is using for a message, or how that use ended. Best effort: a report
+   * that is refused is logged and not sent again. Without it no activity is collected.
+   */
+  activity?(activity: OutboundActivity): Promise<void>;
   /** Tells the service that an interrupt was applied. Optional. */
   interrupt?(conversationId: string): Promise<void>;
   /** Tells the service that a conversation was closed on the agent side. Optional. */
