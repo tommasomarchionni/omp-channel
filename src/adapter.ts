@@ -27,6 +27,11 @@ export interface ChannelAdapter {
   interrupt?(conversationId: string): Promise<void>;
   /** Tells the service that a conversation was closed on the agent side. Optional. */
   close?(conversationId: string): Promise<void>;
+  /**
+   * A short plain-text description of the adapter's state, shown by the `/channel-status` command.
+   * It is for the person who runs the agent: it must not contain keys or message text. Optional.
+   */
+  describe?(): Promise<string> | string;
 }
 
 export function isChannelAdapter(value: unknown): value is ChannelAdapter {

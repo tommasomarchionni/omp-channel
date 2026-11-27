@@ -28,6 +28,7 @@ export function fakePi(sendMode: "accept" | "hold" | "reject" = "accept") {
     ((event: LifecycleEvent, ctx: ExtensionContext) => void)[]
   >();
   const tools: ToolDefinition[] = [];
+  const commands = new Map<string, { handler: (args: string, ctx: unknown) => Promise<void> }>();
   const sent: SentPrompt[] = [];
   const held: (() => void)[] = [];
 
@@ -45,6 +46,12 @@ export function fakePi(sendMode: "accept" | "hold" | "reject" = "accept") {
     },
     registerTool(tool: ToolDefinition) {
       tools.push(tool);
+    },
+    registerCommand(
+      name: string,
+      options: { handler: (args: string, ctx: unknown) => Promise<void> },
+    ) {
+      commands.set(name, options);
     },
     sendUserMessage(content: string, options?: SendUserMessageOptions) {
       sent.push({ content, options });
@@ -76,6 +83,13 @@ export function fakePi(sendMode: "accept" | "hold" | "reject" = "accept") {
       for (const handler of lifecycleHandlers.get(name) ?? []) {
         handler({ type: name }, ctx);
       }
+    },
+    command(name: string) {
+      const command = commands.get(name);
+      if (command === undefined) {
+        throw new Error(`command ${name} not registered`);
+      }
+      return command;
     },
     tool(name: string): ToolDefinition {
       const tool = tools.find((candidate) => candidate.name === name);

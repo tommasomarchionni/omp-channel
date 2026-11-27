@@ -1,12 +1,12 @@
-import type { ChannelAdapter, Delivery } from "./adapter.js";
-import { ACKNOWLEDGED_OUTCOMES, Dispatcher, type SessionPort } from "./dispatcher.js";
-import type { ChannelConfig } from "./config.js";
 import type {
   AgentToolResult,
   ExtensionAPI,
   ExtensionContext,
   ExtensionFactory,
 } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
+import type { ChannelAdapter, Delivery } from "./adapter.js";
+import type { ChannelConfig } from "./config.js";
+import { ACKNOWLEDGED_OUTCOMES, Dispatcher, type SessionPort } from "./dispatcher.js";
 import { parseMcpNotification, parseReplyInput } from "./protocol.js";
 import { jsonSchemaParameters } from "./tool-schema.js";
 
@@ -104,7 +104,44 @@ export function createChannelExtension(options: ChannelExtensionOptions): Extens
         return textResult(result.ok ? "Reply sent." : `Reply not sent: ${result.reason}.`);
       },
     });
+
+    pi.registerCommand(STATUS_COMMAND_NAME, {
+      description: "Show how the channel is connected and what its adapter reports",
+      handler: async (_args, ctx) => {
+        ctx.ui.notify(await channelStatusText(config, adapter, log), "info");
+      },
+    });
   };
+}
+
+/** Name of the command that shows the channel state (`/channel-status`). */
+export const STATUS_COMMAND_NAME = "channel-status";
+
+/**
+ * The text of `/channel-status`: the transport in use, then the adapter's own description when it
+ * has one. A failing description is reported in one line and never shown raw.
+ */
+export async function channelStatusText(
+  config: ChannelConfig,
+  adapter: ChannelAdapter | undefined,
+  log: (line: string) => void,
+): Promise<string> {
+  const transport =
+    config.service !== undefined
+      ? "HTTP service"
+      : adapter !== undefined
+        ? "adapter module"
+        : "MCP push only (replies are not configured)";
+  const lines = [`Channel: ${transport}, MCP server ${config.mcpServer}.`];
+  if (adapter?.describe !== undefined) {
+    try {
+      lines.push(await adapter.describe());
+    } catch {
+      log("the adapter could not describe its state");
+      lines.push("The adapter could not report its state.");
+    }
+  }
+  return lines.join("\n");
 }
 
 /**

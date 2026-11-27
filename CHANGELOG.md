@@ -28,6 +28,8 @@ and the project uses [Semantic Versioning](https://semver.org) once it reaches 1
 
 ### Added
 
+- `/channel-status` command: shows the transport in use and the optional `describe()` text of the
+  adapter (`ChannelAdapter`, docs/protocol.md section 6).
 - Initial alpha: extension for Oh My Pi with MCP push, an HTTP transport with leases and
   acknowledgements, a custom adapter module interface, a validated configuration file,
   `reply` tool, agent status reports, and interrupt and close handling.

@@ -209,11 +209,16 @@ interface ChannelAdapter {
   status?(status: OutboundStatus): Promise<void>; // best effort
   interrupt?(conversationId: string): Promise<void>; // after an interrupt is applied
   close?(conversationId: string): Promise<void>; // after a close is applied
+  describe?(): Promise<string> | string; // plain-text state for the /channel-status command
 }
 ```
 
 `receive` must stop when `signal` aborts. Yield deliveries in order. Throwing from `reply` means
 the reply was not accepted. Errors must not contain secrets.
+
+`describe` is optional. The `/channel-status` command shows the transport in use and the text the
+adapter returns. That text is for the person who runs the agent: it must not contain keys or
+message text. A `describe` that throws is reported as one line; its error text is not shown.
 
 ## 7. Outbound reply (agent to service)
 
