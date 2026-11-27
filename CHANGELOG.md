@@ -5,6 +5,8 @@ and the project uses [Semantic Versioning](https://semver.org) once it reaches 1
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-27
+
 ### Fixed
 
 - The `reply` tool is now among the tools sent to the model (`loadMode: "essential"`). Before,
