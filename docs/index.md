@@ -14,7 +14,12 @@ any product: a service implements the protocol, or an adapter module for its own
 omp install omp-channel
 ```
 
-Then start a session and run `/channel-status` to see the transport in use.
+The extension loads in every session, with no `-e` flag. Start a session and run `/channel-status`
+to see the transport in use.
+
+The configuration file is `.omp/omp-channel.json` in the directory where Oh My Pi starts, or the
+path in the `OMP_CHANNEL_CONFIG` variable. Its fields are in the
+[README](https://github.com/tommasomarchionni/omp-channel#configuration).
 
 ## Documents
 
