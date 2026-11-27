@@ -6,10 +6,16 @@ import type {
 } from "@oh-my-pi/pi-coding-agent/extensibility/extensions/types";
 import type { ChannelAdapter, Delivery } from "./adapter.js";
 import type { ChannelConfig } from "./config.js";
-import { ACKNOWLEDGED_OUTCOMES, Dispatcher, type SessionPort } from "./dispatcher.js";
+import {
+  ACKNOWLEDGED_OUTCOMES,
+  CLOSED_REASON,
+  Dispatcher,
+  SWITCHED_REASON,
+  type SessionPort,
+} from "./dispatcher.js";
 import { parseMcpNotification, parseReplyInput } from "./protocol.js";
 import { jsonSchemaParameters } from "./tool-schema.js";
-import { failedRun } from "./turn.js";
+import { segmentsOf } from "./turn.js";
 
 export const REPLY_TOOL_NAME = "reply";
 
@@ -19,14 +25,16 @@ export interface ChannelExtensionOptions {
   readonly adapter?: ChannelAdapter | undefined;
   /** Receives short diagnostic lines. They never contain message text or keys. */
   readonly log?: (line: string) => void;
+  /** Waits between two attempts to deliver (tests replace it). */
+  readonly wait?: (ms: number) => Promise<void>;
 }
 
 /**
  * Creates the extension factory. It registers:
  * - `mcp_notification`: messages pushed by the configured MCP server enter the agent;
  * - the `reply` tool: the model answers a message by its messageId;
- * - lifecycle hooks: agent state and failed turns are reported to the service, and the adapter
- *   stops on shutdown;
+ * - lifecycle hooks: the agent state is reported, no message is left without an answer or a
+ *   report when a run ends or the session goes away, and the adapter stops on shutdown;
  * - the adapter receive loop, when an adapter is given.
  */
 export function createChannelExtension(options: ChannelExtensionOptions): ExtensionFactory {
@@ -41,7 +49,15 @@ export function createChannelExtension(options: ChannelExtensionOptions): Extens
       abort: () => context?.abort(),
       isIdle: () => context?.isIdle() ?? true,
     };
-    const dispatcher = new Dispatcher({ config, session, adapter, log });
+    const dispatcher = new Dispatcher({
+      config,
+      session,
+      adapter,
+      log,
+      ...(options.wait === undefined ? {} : { wait: options.wait }),
+    });
+    // Counts the runs, so the end of an old one never marks free a newer one.
+    let runs = 0;
 
     pi.on("session_start", (_event, ctx) => {
       context = ctx;
@@ -66,6 +82,7 @@ export function createChannelExtension(options: ChannelExtensionOptions): Extens
 
     pi.on("agent_start", (_event, ctx) => {
       context = ctx;
+      runs += 1;
       dispatcher.setStatus("working");
     });
 
@@ -75,16 +92,28 @@ export function createChannelExtension(options: ChannelExtensionOptions): Extens
       if (event.willContinue === true) {
         return;
       }
-      const failed = failedRun(event);
-      if (failed !== undefined) {
-        void dispatcher.reportFailure(failed.messageIds, failed.reason);
-      }
-      dispatcher.setStatus("free");
+      const run = runs;
+      // The answers go first: a service that hears "free" has already received them.
+      void dispatcher.settle(segmentsOf(event)).finally(() => {
+        if (run === runs) {
+          dispatcher.setStatus("free");
+        }
+      });
+    });
+
+    // A new, resumed or forked session no longer holds the messages that were waiting.
+    pi.on("session_switch", async (_event, ctx) => {
+      context = ctx;
+      await dispatcher.abandon(SWITCHED_REASON);
     });
 
     if (adapter !== undefined) {
       const controller = new AbortController();
-      pi.on("session_shutdown", () => {
+      pi.on("session_shutdown", async () => {
+        // Oh My Pi waits a short time for this handler: report first, then stop the transport.
+        if (dispatcher.hasOpenMessages) {
+          await dispatcher.abandon(CLOSED_REASON);
+        }
         controller.abort();
       });
       void runReceiveLoop(adapter, dispatcher, controller.signal, log);

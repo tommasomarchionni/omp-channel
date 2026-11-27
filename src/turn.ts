@@ -13,69 +13,88 @@ export interface RunEnd {
   readonly messages?: readonly unknown[] | undefined;
 }
 
-/** What the service is told when a run ends normally and a message got no reply. */
+/** Fixed texts a service receives when there is no answer of the model to send. */
 export const NO_REPLY_REASON = "The agent finished without sending a reply";
+export const STOPPED_REASON = "The turn was stopped before the agent answered";
+export const INCOMPLETE_REASON = "The agent stopped before finishing its answer";
 
-export interface FailedRun {
-  /**
-   * The error the model provider reported, as it came (clean it before it leaves the machine), or
-   * `NO_REPLY_REASON` for a run that ended normally.
-   */
-  readonly reason: string | undefined;
-  /** Ids of the channel messages the failed work was answering, oldest first. */
+/**
+ * A stretch of a run that ends with one outcome, and the channel messages it was answering.
+ * `completed`: the model finished an answer (`text`, which may be missing). `failed`: a model
+ * error. `stopped`: aborted, or ended before an answer.
+ */
+export interface Segment {
+  /** Ids of the channel messages this stretch was answering, oldest first. */
   readonly messageIds: readonly string[];
+  readonly outcome: "completed" | "failed" | "stopped";
+  /** Why there is no answer. A model error comes as it is: clean it before it is sent. */
+  readonly reason: string | undefined;
+  /** The text the model ended its answer with, as it came: clean it before it is sent. */
+  readonly text: string | undefined;
 }
 
 /**
- * The messages a finished run may have left without a reply: it ended in a model error, or it
- * ended normally. Undefined for a run that goes on (a retry, background work), an abort, or a run
- * without any channel message. The caller drops the messages that did get a reply.
- *
- * The messages looked at are those after the previous completed answer: an older message that the
- * model finished with is not blamed for a later end.
+ * The channel messages of a finished run, grouped by the answer that closed them. Empty for a run
+ * that Oh My Pi continues (a retry, or background work that has not ended in an error) and for a
+ * run without channel messages. The messages are the whole session, so the caller drops those
+ * that already have a reply or a report.
  */
-export function failedRun(end: RunEnd): FailedRun | undefined {
+export function segmentsOf(end: RunEnd): Segment[] {
   if (end.willContinue === true) {
-    return undefined;
+    return [];
   }
-  const messages = (end.messages ?? []).filter(isRecord);
-  let last = messages.length - 1;
-  while (last >= 0 && messages[last]?.role !== "assistant") {
-    last -= 1;
-  }
-  const failed = messages[last];
-  const errored = failed?.stopReason === "error";
-  const completed = isCompleted(failed?.stopReason) && end.awaitingAsyncWork !== true;
-  if (failed === undefined || (!errored && !completed)) {
-    return undefined;
-  }
-  const ids: string[] = [];
-  for (let index = last - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    if (message === undefined) {
-      continue;
-    }
-    if (message.role === "assistant") {
-      if (isCompleted(message.stopReason)) {
-        break;
-      }
-      continue;
-    }
+  const segments: Segment[] = [];
+  let ids: string[] = [];
+  // The last assistant message after the last completed answer and the last message to answer.
+  let last: Record<string, unknown> | undefined;
+  for (const message of (end.messages ?? []).filter(isRecord)) {
     if (message.role === "user" || message.role === "developer") {
-      ids.unshift(...textsOf(message.content).flatMap(messageIdsIn));
+      ids.push(...textsOf(message.content).flatMap(messageIdsIn));
+      // An end seen before this message says nothing about it.
+      last = undefined;
+    } else if (message.role === "assistant") {
+      if (message.stopReason === "stop" || message.stopReason === "length") {
+        const text = textsOf(message.content).join("\n").trim();
+        add(segments, ids, "completed", undefined, text);
+        ids = [];
+        last = undefined;
+      } else {
+        last = message;
+      }
     }
   }
-  if (ids.length === 0) {
-    return undefined;
+  if (last?.stopReason === "error") {
+    const reason = typeof last.errorMessage === "string" ? last.errorMessage : undefined;
+    add(segments, ids, "failed", reason, "");
+  } else {
+    const aborted = last === undefined || last.stopReason === "aborted";
+    add(segments, ids, "stopped", aborted ? STOPPED_REASON : INCOMPLETE_REASON, "");
   }
-  const error = typeof failed.errorMessage === "string" ? failed.errorMessage : undefined;
-  return { reason: errored ? error : NO_REPLY_REASON, messageIds: [...new Set(ids)] };
+  // Background work will continue the run: only an error is already final.
+  if (end.awaitingAsyncWork === true && segments.at(-1)?.outcome !== "failed") {
+    return [];
+  }
+  return segments;
 }
 
-function isCompleted(stopReason: unknown): boolean {
-  return stopReason === "stop" || stopReason === "length";
+function add(
+  segments: Segment[],
+  ids: readonly string[],
+  outcome: Segment["outcome"],
+  reason: string | undefined,
+  text: string,
+): void {
+  if (ids.length > 0) {
+    segments.push({
+      messageIds: [...new Set(ids)],
+      outcome,
+      reason,
+      text: text === "" ? undefined : text,
+    });
+  }
 }
 
+/** The text parts of a message. Thinking and tool calls are not text. */
 function textsOf(content: unknown): string[] {
   if (typeof content === "string") {
     return [content];
@@ -85,7 +104,11 @@ function textsOf(content: unknown): string[] {
   }
   return content
     .filter(isRecord)
-    .flatMap((part) => (typeof part.text === "string" ? [part.text] : []));
+    .flatMap((part) =>
+      (part.type === undefined || part.type === "text") && typeof part.text === "string"
+        ? [part.text]
+        : [],
+    );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { AdapterError, type ChannelAdapter } from "./adapter.js";
 import type { ChannelConfig } from "./config.js";
-import { cleanReason } from "./redact.js";
+import { cleanReason, cleanText } from "./redact.js";
 import type { SendUserMessageOptions } from "@oh-my-pi/pi-coding-agent/session/agent-session-types";
 import {
   type AgentStatus,
@@ -12,6 +12,7 @@ import {
   type InboundEvent,
   type MessageEvent,
 } from "./protocol.js";
+import { NO_REPLY_REASON, type Segment } from "./turn.js";
 
 /** What happened to an inbound event. The outcomes marked as acknowledged may be acked. */
 export type AdmitOutcome =
@@ -42,11 +43,22 @@ export interface DispatcherOptions {
   readonly log: (line: string) => void;
   readonly now?: () => Date;
   readonly newId?: () => string;
+  /** Waits between two attempts to deliver (tests replace it). */
+  readonly wait?: (ms: number) => Promise<void>;
 }
 
 export type ReplyResult = { ok: true } | { ok: false; reason: string };
 
 const MAX_REMEMBERED = 1000;
+
+/** Waits before each attempt to deliver what the end of a run owes the service. */
+const ATTEMPT_DELAYS_MS: readonly number[] = [0, 1_000, 5_000];
+
+/** The reply a message gets when the answer to a later one covers it. */
+export const ANSWERED_LATER_TEXT = "Answered together with a later message.";
+export const UNDELIVERED_REASON = "The agent answered, but the answer could not be delivered";
+export const CLOSED_REASON = "The agent was closed before it answered";
+export const SWITCHED_REASON = "The agent moved to another session before it answered";
 
 /**
  * Applies inbound events to the agent session, one at a time and in arrival order.
@@ -57,7 +69,8 @@ const MAX_REMEMBERED = 1000;
  *   without running again.
  * - Interrupt stops the current turn only. Tool results already produced stay in the session.
  * - Agent state is reported to the service for the open conversation.
- * - A message that a failed turn left unanswered is reported once.
+ * - A message is never left waiting: when a run ends, or the session goes away, every message
+ *   without a reply gets the final answer of the model, a note, or a failure report.
  */
 export class Dispatcher {
   readonly #options: DispatcherOptions;
@@ -68,6 +81,10 @@ export class Dispatcher {
   readonly #conversationOf = new RecentMap(MAX_REMEMBERED);
   readonly #answered = new RecentSet(MAX_REMEMBERED);
   readonly #reportedFailed = new RecentSet(MAX_REMEMBERED);
+  /** Messages whose end is being sent now, so a second end of a run does not send it twice. */
+  readonly #settling = new Set<string>();
+  /** Admitted messages that have neither a reply nor a report yet, oldest first. */
+  readonly #waiting = new Set<string>();
 
   constructor(options: DispatcherOptions) {
     this.#options = options;
@@ -121,6 +138,7 @@ export class Dispatcher {
     try {
       await adapter.reply(reply);
       this.#answered.add(messageId);
+      this.#waiting.delete(messageId);
       return { ok: true };
     } catch (error) {
       const detail =
@@ -130,47 +148,145 @@ export class Dispatcher {
   }
 
   /**
-   * Tells the service that a failed turn left these messages unanswered. Messages that were not
-   * admitted here, already answered or already reported are skipped. Best effort: a report that
-   * is refused is logged, and a later failure of the same message tries again.
+   * Closes what a finished run left open. For each message without a reply or a report: the final
+   * text of the model as its reply (when the run completed with one), a note when a later message
+   * got the answer, or a failure report. Refused calls are tried again, and a message that could
+   * not be closed stays open for the end of the next run.
    */
-  async reportFailure(messageIds: readonly string[], reason: string | undefined): Promise<void> {
-    const waiting = messageIds.flatMap((messageId) => {
-      const conversation = this.#conversationOf.get(messageId);
-      return conversation === undefined ||
-        this.#answered.has(messageId) ||
-        this.#reportedFailed.has(messageId)
-        ? []
-        : [{ messageId, conversation }];
-    });
-    if (waiting.length === 0) {
+  async settle(segments: readonly Segment[]): Promise<void> {
+    const order = segments.flatMap((segment) => segment.messageIds);
+    const open = new Set(order.filter((messageId) => this.#isOpen(messageId)));
+    // Taken before the first wait.
+    for (const messageId of open) {
+      this.#settling.add(messageId);
+    }
+    try {
+      for (const segment of segments) {
+        const mine = segment.messageIds.filter((messageId) => open.has(messageId));
+        // Covered: a message that came after it already has its answer.
+        const covered = mine.filter((messageId) =>
+          order.slice(order.indexOf(messageId) + 1).some((later) => this.#answered.has(later)),
+        );
+        await this.#close(
+          segment,
+          mine.filter((id) => !covered.includes(id)),
+          covered,
+        );
+      }
+    } finally {
+      for (const messageId of open) {
+        this.#settling.delete(messageId);
+      }
+    }
+  }
+
+  /** The session goes away: every open message is reported, with one attempt. */
+  async abandon(reason: string): Promise<void> {
+    const open = [...this.#waiting].filter((messageId) => this.#isOpen(messageId));
+    await Promise.all(open.map((messageId) => this.#reportFailure(messageId, reason, [0])));
+  }
+
+  /** True while some admitted message has neither a reply nor a report. */
+  get hasOpenMessages(): boolean {
+    return [...this.#waiting].some((messageId) => this.#isOpen(messageId));
+  }
+
+  async #close(segment: Segment, due: string[], covered: string[]): Promise<void> {
+    const { config } = this.#options;
+    const newest = due.at(-1);
+    const text =
+      newest !== undefined && config.replies.fromFinalText && segment.text !== undefined
+        ? cleanText(segment.text, config.limits.maxTextLength)
+        : undefined;
+    let notes = covered;
+    if (newest !== undefined && text !== undefined) {
+      if (await this.#deliverReply(newest, text)) {
+        notes = [...covered, ...due.slice(0, -1)];
+      } else {
+        for (const messageId of due) {
+          await this.#reportFailure(messageId, UNDELIVERED_REASON);
+        }
+      }
+    } else {
+      const reason =
+        segment.reason ?? (segment.outcome === "completed" ? NO_REPLY_REASON : undefined);
+      for (const messageId of due) {
+        await this.#reportFailure(messageId, reason);
+      }
+    }
+    for (const messageId of notes) {
+      if (!(await this.#deliverReply(messageId, ANSWERED_LATER_TEXT))) {
+        await this.#reportFailure(messageId, UNDELIVERED_REASON);
+      }
+    }
+  }
+
+  #isOpen(messageId: string): boolean {
+    return (
+      this.#conversationOf.get(messageId) !== undefined &&
+      !this.#answered.has(messageId) &&
+      !this.#reportedFailed.has(messageId) &&
+      !this.#settling.has(messageId)
+    );
+  }
+
+  async #deliverReply(messageId: string, text: string): Promise<boolean> {
+    for (const delay of ATTEMPT_DELAYS_MS) {
+      await this.#wait(delay);
+      // The model may have answered while this waited.
+      if (this.#answered.has(messageId) || (await this.reply(messageId, text)).ok) {
+        return true;
+      }
+    }
+    this.#options.log("an answer could not be delivered");
+    return false;
+  }
+
+  async #reportFailure(
+    messageId: string,
+    reason: string | undefined,
+    delays: readonly number[] = ATTEMPT_DELAYS_MS,
+  ): Promise<void> {
+    const conversation = this.#conversationOf.get(messageId);
+    if (conversation === undefined) {
       return;
     }
     const adapter = this.#options.adapter;
     if (adapter?.failure === undefined) {
-      this.#options.log("a turn failed and the adapter does not report failures");
+      this.#options.log("a message got no answer and the adapter does not report failures");
       return;
     }
     const shown =
       this.#options.config.failures.includeReason && reason !== undefined
         ? cleanReason(reason)
         : undefined;
-    // Marked before the first wait, so a second end of the same run does not report twice.
-    for (const { messageId } of waiting) {
-      this.#reportedFailed.add(messageId);
-    }
-    for (const { messageId, conversation } of waiting) {
-      const report = buildFailure(conversation, messageId, shown, {
-        messageId: this.#newId(),
-        at: this.#now(),
-      });
+    const report = buildFailure(conversation, messageId, shown, {
+      messageId: this.#newId(),
+      at: this.#now(),
+    });
+    let failure = "unknown";
+    for (const delay of delays) {
+      await this.#wait(delay);
+      if (this.#answered.has(messageId)) {
+        return;
+      }
       try {
         await adapter.failure(report);
+        this.#reportedFailed.add(messageId);
+        this.#waiting.delete(messageId);
+        return;
       } catch (error) {
-        this.#reportedFailed.delete(messageId);
-        this.#options.log(`failure was not reported (${errorName(error)})`);
+        failure = errorName(error);
       }
     }
+    this.#options.log(`failure was not reported (${failure})`);
+  }
+
+  async #wait(ms: number): Promise<void> {
+    if (ms === 0) {
+      return;
+    }
+    await (this.#options.wait?.(ms) ?? new Promise<void>((resolve) => setTimeout(resolve, ms)));
   }
 
   async #apply(event: InboundEvent, deliveryId: string | undefined): Promise<AdmitOutcome> {
@@ -230,6 +346,7 @@ export class Dispatcher {
     this.#active = event.conversationId;
     this.#remembered.add(key);
     this.#conversationOf.set(event.messageId, event.conversationId);
+    this.#waiting.add(event.messageId);
     return "admitted";
   }
 

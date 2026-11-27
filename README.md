@@ -222,6 +222,7 @@ the extension and writes the reason (with its path) to stderr.
 | `limits.maxPending`        | `5`                                                              | Events waiting to be admitted; more are dropped and not acknowledged.                           |
 | `delivery.deliverAs`       | `"followUp"`                                                     | How a message is queued in Oh My Pi: `steer`, `followUp` or `aside`.                            |
 | `failures.includeReason`   | `true`                                                           | Send the cleaned error text when a turn fails and leaves a message unanswered.                  |
+| `replies.fromFinalText`    | `true`                                                           | Send the cleaned final text of the model as the reply when it did not use the `reply` tool.     |
 | `adapterModule`            | none                                                             | Path to a module that exports a `ChannelAdapter`. Replaces the HTTP transport.                  |
 
 Environment variables:
@@ -249,11 +250,11 @@ Environment variables:
   known secret shapes and the home folder name hidden. `failures.includeReason: false` keeps it on
   the machine.
 
-## When a turn fails
+## No message is left waiting
 
-If the model request fails (the model is not loaded, the key is refused, the service is down) the
-service receives a `failure` report for each message that got no answer, so the person is not left
-waiting. Oh My Pi retries some errors first; the report is sent only when it gives up. See
+If the model answers at the terminal without calling `reply`, its final text is sent as the reply.
+If there is no answer to send (a model error, a stopped turn, a closed session) the service
+receives a `failure` report with the reason. All cases are listed in
 [docs/protocol.md](docs/protocol.md), section 9.
 
 Report vulnerabilities privately, as described in [SECURITY.md](SECURITY.md).

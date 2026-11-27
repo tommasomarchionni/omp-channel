@@ -252,5 +252,20 @@ model; a test adapter module and a stand-in service.
 | tools sent to the model, fixed | pass   | `reply` is listed with the built-in tools                               |
 | local model answers a message  | pass   | the model called `reply`; the service received the text, then `free`    |
 
-Not verified: a real model that ends without calling `reply` (unit tests cover the report), and the
-interactive terminal interface.
+Not verified: the interactive terminal interface.
+
+## No message left waiting (27/11/2026, Oh My Pi 19.2.1, RPC mode)
+
+Method: a loopback model endpoint (a plain answer, or no answer at all), then one run with a local
+model; a test adapter module and a stand-in service.
+
+| Case                                       | Result | Observed                                                              |
+| ------------------------------------------ | ------ | --------------------------------------------------------------------- |
+| answer without a `reply` call              | pass   | the final text arrived as the reply, with a key hidden, then `free`   |
+| interrupt from the service during a turn   | pass   | `failure`: the turn was stopped, then `free`                          |
+| input closed during a turn                 | pass   | `failure`: the agent was closed; Oh My Pi exited by itself            |
+| process ended with `SIGTERM` during a turn | fail   | nothing was sent: a service must show that the agent is not connected |
+| local model answers with the `reply` tool  | pass   | one reply, no duplicate from the final text                           |
+
+Not verified: a session switch, a refused reply against a real service and several messages in one
+run (unit tests cover them).

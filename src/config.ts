@@ -37,6 +37,11 @@ export interface FailuresConfig {
   readonly includeReason: boolean;
 }
 
+export interface RepliesConfig {
+  /** Send the final text of the model as the reply when it did not use the reply tool. */
+  readonly fromFinalText: boolean;
+}
+
 export interface ChannelConfig {
   readonly mcpServer: string;
   readonly service: ServiceConfig | undefined;
@@ -45,6 +50,7 @@ export interface ChannelConfig {
   readonly limits: Limits & { maxPending: number };
   readonly delivery: DeliveryConfig;
   readonly failures: FailuresConfig;
+  readonly replies: RepliesConfig;
 }
 
 export interface ConfigSources {
@@ -98,6 +104,7 @@ export function loadConfig(sources: ConfigSources): ChannelConfig {
     limits: { maxTextLength: number; maxSenderLength: number; maxPending: number };
     delivery: { deliverAs: DeliveryConfig["deliverAs"] };
     failures: FailuresConfig;
+    replies: RepliesConfig;
   };
 
   const service = parsed.service === undefined ? undefined : loadService(parsed.service, sources);
@@ -110,6 +117,7 @@ export function loadConfig(sources: ConfigSources): ChannelConfig {
     limits: parsed.limits,
     delivery: parsed.delivery,
     failures: parsed.failures,
+    replies: parsed.replies,
   };
 }
 

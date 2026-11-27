@@ -8,8 +8,9 @@ import type { SendUserMessageOptions } from "@oh-my-pi/pi-coding-agent/session/a
 
 /** Lifecycle events used by the fake API. Only the event type is needed. */
 export interface LifecycleEvent {
-  type: "session_start" | "agent_start" | "agent_end" | "session_shutdown";
+  type: "session_start" | "session_switch" | "agent_start" | "agent_end" | "session_shutdown";
   willContinue?: boolean;
+  awaitingAsyncWork?: boolean;
   messages?: unknown[];
 }
 
