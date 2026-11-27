@@ -89,6 +89,9 @@ mkdirSync(agentDir, { recursive: true });
 const machineModels = join(homedir(), ".omp", "agent", "models.yml");
 if (!existsSync(machineModels)) fail("the machine has no models.yml with the local provider");
 symlinkSync(machineModels, join(agentDir, "models.yml"));
+// The provider keys of the agent are in its .env file: linked too, not copied.
+const machineEnv = join(homedir(), ".omp", "agent", ".env");
+if (existsSync(machineEnv)) symlinkSync(machineEnv, join(agentDir, ".env"));
 writeFileSync(
   join(agentDir, "config.yml"),
   "update:\n  auto: false\ntelemetry:\n  otlpExportEnabled: false\nweb_search:\n  enabled: false\n",
@@ -306,8 +309,11 @@ async function waitForIdle(label) {
   throw new Error(`timed out waiting for idle (${label})`);
 }
 
+// get_branch_messages returns entries with a flat `text`, or with a `content` list of parts. Both are
+// read.
 function userTexts(messages) {
   return (messages ?? []).flatMap((message) => {
+    if (typeof message.text === "string") return [message.text];
     const content = Array.isArray(message.content) ? message.content : [message.content];
     return content
       .map((part) => (typeof part === "string" ? part : (part?.text ?? "")))

@@ -71,6 +71,22 @@ status and `abort` remain not verified.
 A single prompt turn with the local model completed in about 100 seconds, so a slow answer is not
 the cause of the failures.
 
+### First real results with a fresh home (26/11/2026, guard off)
+
+| Check                            | Result        | What was observed                                                                              |
+| -------------------------------- | ------------- | ---------------------------------------------------------------------------------------------- |
+| startup                          | pass          | RPC ready, extension loaded                                                                    |
+| idle push starts a turn          | pass          | the push was delivered, the model answered, the message is in the session branch               |
+| push during a turn is queued     | fail (check)  | the second message entered the same agent run at a turn boundary, before the final `agent_end` |
+| abort keeps tool output          | pass          | the tool output stayed in the branch and the agent became idle                                 |
+| working/free status to a service | not exercised | no service adapter in this run                                                                 |
+
+The queued message was not lost and was not inserted in the middle of a tool call. The check
+expected it after the final `agent_end`, which is not how `followUp` behaves in Oh My Pi 19.2.1: the
+message was taken at a turn boundary of the same run. Whether this is the queueing the extension
+must provide is a decision about the expected behaviour, and it is open; the check's criterion has
+not been changed yet.
+
 ### Run with the tool-declaring server and a fresh home (26/11/2026)
 
 The example server now declares one tool (`example_status`) and the `tools` capability. In a fresh
