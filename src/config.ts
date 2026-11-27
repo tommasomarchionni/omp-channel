@@ -47,6 +47,11 @@ export interface ReportsConfig {
   readonly activity: boolean;
 }
 
+export interface ContextConfig {
+  /** Keys of the message context shown to the model. Empty: none is shown. */
+  readonly include: readonly string[];
+}
+
 export interface ChannelConfig {
   readonly mcpServer: string;
   readonly service: ServiceConfig | undefined;
@@ -57,6 +62,7 @@ export interface ChannelConfig {
   readonly failures: FailuresConfig;
   readonly replies: RepliesConfig;
   readonly reports: ReportsConfig;
+  readonly context: ContextConfig;
 }
 
 export interface ConfigSources {
@@ -112,6 +118,7 @@ export function loadConfig(sources: ConfigSources): ChannelConfig {
     failures: FailuresConfig;
     replies: RepliesConfig;
     reports: ReportsConfig;
+    context: ContextConfig;
   };
 
   const service = parsed.service === undefined ? undefined : loadService(parsed.service, sources);
@@ -126,6 +133,7 @@ export function loadConfig(sources: ConfigSources): ChannelConfig {
     failures: parsed.failures,
     replies: parsed.replies,
     reports: parsed.reports,
+    context: parsed.context,
   };
 }
 

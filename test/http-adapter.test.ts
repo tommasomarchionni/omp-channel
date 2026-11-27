@@ -156,6 +156,23 @@ describe("HTTP transport", () => {
     );
   });
 
+  it("passes the message context through unchanged", async () => {
+    const context = { route: "/pricing", title: "Prices" };
+    const service = fakeService(() =>
+      json({
+        deliveries: [
+          {
+            deliveryId: "d1",
+            leaseExpiresAt: "2026-11-26T10:00:30Z",
+            event: { ...validEvent, context },
+          },
+        ],
+      }),
+    );
+    const [delivery] = await collect(adapterWith(service.fetchFn), 1);
+    assert.deepEqual(delivery?.event, { ...validEvent, context });
+  });
+
   it("posts replies and statuses to their paths", async () => {
     const service = fakeService(() => new Response(null, { status: 200 }));
     const adapter = adapterWith(service.fetchFn);

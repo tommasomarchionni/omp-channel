@@ -208,25 +208,26 @@ extension still receives MCP pushes, but replies are reported as not configured.
 validated against [schema/config.schema.json](schema/config.schema.json). An invalid file disables
 the extension and writes the reason (with its path) to stderr.
 
-| Key                        | Default                                                          | Meaning                                                                                         |
-| -------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `mcpServer`                | `"omp-channel"`                                                  | MCP server name that may push messages.                                                         |
-| `service.url`              | none                                                             | Base URL of the service. `https` required; `http` only for loopback.                            |
-| `service.keyEnv`           | `"OMP_CHANNEL_KEY"`                                              | Environment variable holding the key (`<keyEnv>_FILE` for a file). Required with `service.url`. |
-| `service.requestTimeoutMs` | `10000`                                                          | Timeout of each request.                                                                        |
-| `service.paths.*`          | `/messages`, `/messages/ack`, `/replies`, `/status`, `/failures` | Endpoint paths.                                                                                 |
-| `service.paths.activity`   | none                                                             | Where activity reports are posted. Without it none are sent over HTTP.                          |
-| `poll.intervalMs`          | `2000`                                                           | Wait between polls when the queue is empty.                                                     |
-| `poll.maxBackoffMs`        | `30000`                                                          | Longest wait after failed polls.                                                                |
-| `poll.batchSize`           | `10`                                                             | Deliveries requested per poll.                                                                  |
-| `limits.maxTextLength`     | `4000`                                                           | Longest message text, in characters.                                                            |
-| `limits.maxSenderLength`   | `64`                                                             | Longest sender name.                                                                            |
-| `limits.maxPending`        | `5`                                                              | Events waiting to be admitted; more are dropped and not acknowledged.                           |
-| `delivery.deliverAs`       | `"followUp"`                                                     | How a message is queued in Oh My Pi: `steer`, `followUp` or `aside`.                            |
-| `failures.includeReason`   | `true`                                                           | Send the cleaned error text when a turn fails and leaves a message unanswered.                  |
-| `replies.fromFinalText`    | `true`                                                           | Send the cleaned final text of the model as the reply when it did not use the `reply` tool.     |
-| `reports.activity`         | `true`                                                           | Report the tools used for a message, when the transport takes it (docs/protocol.md 10).         |
-| `adapterModule`            | none                                                             | Path to a module that exports a `ChannelAdapter`. Replaces the HTTP transport.                  |
+| Key                        | Default                                                          | Meaning                                                                                                               |
+| -------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `mcpServer`                | `"omp-channel"`                                                  | MCP server name that may push messages.                                                                               |
+| `service.url`              | none                                                             | Base URL of the service. `https` required; `http` only for loopback.                                                  |
+| `service.keyEnv`           | `"OMP_CHANNEL_KEY"`                                              | Environment variable holding the key (`<keyEnv>_FILE` for a file). Required with `service.url`.                       |
+| `service.requestTimeoutMs` | `10000`                                                          | Timeout of each request.                                                                                              |
+| `service.paths.*`          | `/messages`, `/messages/ack`, `/replies`, `/status`, `/failures` | Endpoint paths.                                                                                                       |
+| `service.paths.activity`   | none                                                             | Where activity reports are posted. Without it none are sent over HTTP.                                                |
+| `poll.intervalMs`          | `2000`                                                           | Wait between polls when the queue is empty.                                                                           |
+| `poll.maxBackoffMs`        | `30000`                                                          | Longest wait after failed polls.                                                                                      |
+| `poll.batchSize`           | `10`                                                             | Deliveries requested per poll.                                                                                        |
+| `limits.maxTextLength`     | `4000`                                                           | Longest message text, in characters.                                                                                  |
+| `limits.maxSenderLength`   | `64`                                                             | Longest sender name.                                                                                                  |
+| `limits.maxPending`        | `5`                                                              | Events waiting to be admitted; more are dropped and not acknowledged.                                                 |
+| `delivery.deliverAs`       | `"followUp"`                                                     | How a message is queued in Oh My Pi: `steer`, `followUp` or `aside`.                                                  |
+| `failures.includeReason`   | `true`                                                           | Send the cleaned error text when a turn fails and leaves a message unanswered.                                        |
+| `replies.fromFinalText`    | `true`                                                           | Send the cleaned final text of the model as the reply when it did not use the `reply` tool.                           |
+| `reports.activity`         | `true`                                                           | Report the tools used for a message, when the transport takes it (docs/protocol.md 10).                               |
+| `context.include`          | `[]`                                                             | Keys of the message `context` shown to the model, inside the envelope. Other keys are dropped (docs/protocol.md 3.1). |
+| `adapterModule`            | none                                                             | Path to a module that exports a `ChannelAdapter`. Replaces the HTTP transport.                                        |
 
 Environment variables:
 

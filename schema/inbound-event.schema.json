@@ -47,6 +47,18 @@
         "attribution": {
           "type": "string",
           "enum": ["user", "agent"]
+        },
+        "context": {
+          "description": "Extra facts about the message, shown to the model only for the keys listed in context.include. Values longer than 200 characters are cut by omp-channel.",
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 8,
+          "patternProperties": {
+            "^[a-z][a-z0-9_]{0,31}$": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
         }
       }
     },

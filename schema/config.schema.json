@@ -180,6 +180,24 @@
       },
       "default": {}
     },
+    "context": {
+      "description": "Extra facts of a message (the context object of the inbound event). The model sees only the keys listed here, and only when the message has them.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "include": {
+          "description": "Keys of the message context to show to the model, as data inside the message envelope. Keys not listed are not shown.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{0,31}$"
+          },
+          "default": []
+        }
+      },
+      "default": {}
+    },
     "adapterModule": {
       "description": "Path (relative to the working directory) of a JavaScript module whose default export implements ChannelAdapter. Replaces the HTTP service transport.",
       "type": "string",
