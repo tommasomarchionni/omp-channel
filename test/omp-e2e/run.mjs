@@ -406,16 +406,25 @@ async function scenarios() {
       Date.now() - started,
     );
   } else {
-    const turnEnd = frames.findIndex(
-      (frame, position) => frame.type === "agent_end" && position < secondIndex && position > 0,
-    );
-    const queued = turnEnd !== -1 && turnEnd < secondIndex;
+    // Contract (docs/protocol.md 3.5): a message pushed while busy is taken at the next turn
+    // boundary (turn_end or agent_end) and never inside a tool call. Frames before the second
+    // push: the last boundary must come after the first agent_start, and the most recent tool
+    // frame must be a completed one.
+    const firstStart = frames.findIndex((frame) => frame.type === "agent_start");
+    let boundary = -1;
+    let lastTool;
+    for (let position = firstStart + 1; position < secondIndex; position += 1) {
+      const type = frames[position].type;
+      if (type === "turn_end" || type === "agent_end") boundary = position;
+      if (type === "tool_execution_start" || type === "tool_execution_end") lastTool = type;
+    }
+    const atBoundary = firstStart !== -1 && boundary !== -1 && lastTool !== "tool_execution_start";
     record(
       "push during a turn is queued",
-      queued ? "pass" : "fail",
-      queued
-        ? "the second push started after an agent_end"
-        : "the second push started before any agent_end",
+      atBoundary ? "pass" : "fail",
+      atBoundary
+        ? "the second push was taken at a turn boundary, not inside a tool call"
+        : "the second push was not taken at a turn boundary of the running agent",
       Date.now() - started,
     );
   }

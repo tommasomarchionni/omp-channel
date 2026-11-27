@@ -97,6 +97,21 @@ What Oh My Pi does with each value (for example whether it changes how the turn 
 initiator it records) is **not verified**. The result will be recorded in
 `docs/omp-verification.md`, section "Attribution".
 
+### 3.5 Delivery while the agent is busy
+
+An inbound `message` that arrives while a turn runs is delivered with `delivery.deliverAs`
+(default `followUp`; `steer` and `aside` are the other values, see the README). The contract for
+`followUp`:
+
+- The message is not lost and is not dropped.
+- It is taken at a turn boundary: the next `turn_end` of the running agent, or the `agent_end` when
+  no turn follows. It is never inserted inside a tool call.
+- It is not guaranteed to wait for the final `agent_end` of the run. Oh My Pi 19.2.1 can take it at
+  an earlier turn boundary of the same run, and that is the expected behaviour.
+
+The check in `test/omp-e2e/run.mjs` tests this rule (scenario 2). It is `not-exercised` when the
+model finishes before the second push.
+
 ## 4. HTTP transport
 
 Paths are relative to `service.url` and configurable in `service.paths`. Defaults:

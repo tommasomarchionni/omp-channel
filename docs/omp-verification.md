@@ -10,18 +10,18 @@ Oh My Pi needs **Bun 1.4.4 or later** at runtime. On 26/11/2026 the system Bun w
 
 ## Status
 
-| Check                                                            | Status       | How it was checked                                                                                                                         |
-| ---------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Oh My Pi starts in RPC mode with `-e dist/index.js`              | verified     | RPC `ready` frame received                                                                                                                 |
-| The extension loads and runs with a valid configuration          | not verified | the check stops at startup if the extension disables itself (tested with a stand-in `omp`); a real load is not yet confirmed in a real run |
-| MCP server connects and `mcp_notification` reaches the extension | not verified | the run stopped before any turn; see "Last real run"                                                                                       |
-| First push starts a turn on an idle agent                        | not verified | scenario 1: not reached                                                                                                                    |
-| Push during a running turn is queued as follow-up (not steer)    | not verified | scenario 2: not reached                                                                                                                    |
-| `attribution` values (`user`, `agent`): the example uses `user`  | decided      | the value is a contract choice; its effect in Oh My Pi is open, see "Attribution" below                                                    |
-| Effect of `attribution` in Oh My Pi                              | not verified | needs a run with each value; see "Attribution" below                                                                                       |
-| `abort` stops the turn and keeps tool results                    | not verified | scenario 3: not reached                                                                                                                    |
-| Agent status (`working`/`free`) reported to a service            | not verified | needs a service; not part of the script                                                                                                    |
-| Plain JSON Schema tool parameters accepted by Oh My Pi           | not verified | see "Tool parameter schema" below                                                                                                          |
+| Check                                                                         | Status       | How it was checked                                                                      |
+| ----------------------------------------------------------------------------- | ------------ | --------------------------------------------------------------------------------------- |
+| Oh My Pi starts in RPC mode with `-e dist/index.js`                           | verified     | RPC `ready` frame received                                                              |
+| The extension loads and runs with a valid configuration                       | verified     | startup of 27/11/2026: extension loaded, no `disabled` line on stderr                   |
+| MCP server connects and `mcp_notification` reaches the extension              | verified     | scenarios 1-3 of 27/11/2026: the pushes arrived as `message_start` frames               |
+| First push starts a turn on an idle agent                                     | verified     | scenario 1, run of 27/11/2026: pass, message in the session branch                      |
+| Push during a running turn is taken at a turn boundary (docs/protocol.md 3.5) | verified     | scenario 2, run of 27/11/2026: pass                                                     |
+| `attribution` values (`user`, `agent`): the example uses `user`               | decided      | the value is a contract choice; its effect in Oh My Pi is open, see "Attribution" below |
+| Effect of `attribution` in Oh My Pi                                           | not verified | needs a run with each value; see "Attribution" below                                    |
+| `abort` stops the turn and keeps tool results                                 | verified     | scenario 3, run of 27/11/2026: pass, agent idle after abort                             |
+| Agent status (`working`/`free`) reported to a service                         | not verified | needs a service; not part of the script                                                 |
+| Plain JSON Schema tool parameters accepted by Oh My Pi                        | not verified | see "Tool parameter schema" below                                                       |
 
 ## How to run the check
 
@@ -73,19 +73,35 @@ the cause of the failures.
 
 ### First real results with a fresh home (26/11/2026, guard off)
 
-| Check                            | Result        | What was observed                                                                              |
-| -------------------------------- | ------------- | ---------------------------------------------------------------------------------------------- |
-| startup                          | pass          | RPC ready, extension loaded                                                                    |
-| idle push starts a turn          | pass          | the push was delivered, the model answered, the message is in the session branch               |
-| push during a turn is queued     | fail (check)  | the second message entered the same agent run at a turn boundary, before the final `agent_end` |
-| abort keeps tool output          | pass          | the tool output stayed in the branch and the agent became idle                                 |
-| working/free status to a service | not exercised | no service adapter in this run                                                                 |
+| Check                            | Result                     | What was observed                                                                              |
+| -------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------- |
+| startup                          | pass                       | RPC ready, extension loaded                                                                    |
+| idle push starts a turn          | pass                       | the push was delivered, the model answered, the message is in the session branch               |
+| push during a turn is queued     | fail (check, before 27/11) | the second message entered the same agent run at a turn boundary, before the final `agent_end` |
+| abort keeps tool output          | pass                       | the tool output stayed in the branch and the agent became idle                                 |
+| working/free status to a service | not exercised              | no service adapter in this run                                                                 |
 
 The queued message was not lost and was not inserted in the middle of a tool call. The check
 expected it after the final `agent_end`, which is not how `followUp` behaves in Oh My Pi 19.2.1: the
 message was taken at a turn boundary of the same run. Whether this is the queueing the extension
 must provide is a decision about the expected behaviour, and it is open; the check's criterion has
 not been changed yet.
+
+### Run with the queueing contract (27/11/2026, guard off)
+
+Command: `OMP_E2E=1 OMP_E2E_MODEL=unsloth/inkling-2-mini-unsloth:UD-Q4_K_XL npm run omp:e2e`.
+The check now follows the contract in docs/protocol.md section 3.5: a push made while busy is taken
+at a turn boundary (`turn_end` or `agent_end`) and never inside a tool call. The criterion of the
+earlier run (after the final `agent_end`) was not the contract and was replaced.
+
+| Check                            | Result        |
+| -------------------------------- | ------------- |
+| startup                          | pass          |
+| idle push starts a turn          | pass (34.8 s) |
+| push during a turn is queued     | pass          |
+| abort keeps tool output          | pass          |
+| agent idle after abort           | pass          |
+| working/free status to a service | not exercised |
 
 ### Run with the tool-declaring server and a fresh home (26/11/2026)
 

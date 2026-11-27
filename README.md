@@ -15,8 +15,9 @@ service, it contains **no models**, and it does **not** manage accounts. You pro
 and the model; omp-channel is the link between them.
 
 > **Status: alpha, not published.** The behaviour is covered by automated tests that use fakes and
-> a loopback HTTP service. Oh My Pi starts and loads the extension, but delivery, turns, queueing
-> and abort are **not yet verified in a live session**. See
+> a loopback HTTP service. Startup, delivery to an idle session, queueing during a turn and abort
+> have passed in a live Oh My Pi session; the status report and the attribution values are not yet
+> verified. See
 > [docs/omp-verification.md](docs/omp-verification.md) for each check and what is open.
 
 ## Contents
@@ -230,8 +231,11 @@ Report vulnerabilities privately, as described in [SECURITY.md](SECURITY.md).
 - The extension types come from the exact devDependency `@oh-my-pi/pi-coding-agent@19.2.1`. They
   are imported, not copied. One gap is documented in `src/tool-schema.ts`: the tool parameters are
   plain JSON Schema where Oh My Pi declares a TypeBox schema.
-- **Not verified yet:** delivery of pushed messages to a running session, queueing during a turn,
-  abort, and the effect of each `attribution` value. See [docs/omp-verification.md](docs/omp-verification.md).
+- **Verified in a live Oh My Pi session (19.2.1, local model):** startup, delivery of a pushed
+  message to an idle session, a message pushed during a turn (taken at a turn boundary, see
+  [docs/protocol.md](docs/protocol.md) section 3.5), and abort.
+- **Not verified yet:** the status report (`working`/`free`) to a service, and the effect of each
+  `attribution` value. See [docs/omp-verification.md](docs/omp-verification.md).
 - `npm ci` also installs the Oh My Pi package for type checking; it is large.
 
 ## Troubleshooting
