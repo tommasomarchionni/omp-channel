@@ -1,0 +1,8 @@
+title: omp-channel
+description: Connect a service to an Oh My Pi agent session.
+theme: minima
+baseurl: "/omp-channel"
+url: "https://tommasomarchionni.github.io"
+repository: tommasomarchionni/omp-channel
+exclude:
+  - README.md

@@ -1,3 +1,9 @@
+---
+
+title: Verification in Oh My Pi
+description: What was verified in a real Oh My Pi session, and what was not.
+---
+
 # Verification in a real Oh My Pi session
 
 The automated tests (`npm test`) run omp-channel against fakes and against a loopback service.

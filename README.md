@@ -1,8 +1,11 @@
 # omp-channel
 
 [![CI](https://github.com/tommasomarchionni/omp-channel/actions/workflows/ci.yml/badge.svg)](https://github.com/tommasomarchionni/omp-channel/actions/workflows/ci.yml)
+
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Node.js 20+](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)
+
+Documentation: <https://tommasomarchionni.github.io/omp-channel/>
 
 **omp-channel** is an extension for [Oh My Pi](https://github.com/can1357/oh-my-pi) (OMP), a
 terminal agent harness. It delivers messages from an external service (any system that exchanges messages

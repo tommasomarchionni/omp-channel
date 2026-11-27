@@ -1,3 +1,9 @@
+---
+
+title: Releasing
+description: How omp-channel is released to GitHub and npm.
+---
+
 # Releasing
 
 A release is made by hand from the **Release** workflow. Nothing is published automatically.
