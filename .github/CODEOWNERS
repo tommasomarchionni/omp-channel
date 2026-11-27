@@ -1,5 +1,5 @@
-# Replace @OWNER with the maintainer account before publishing.
-* @OWNER
-/.github/ @OWNER
-/schema/ @OWNER
-/docs/protocol.md @OWNER
+# Replace @tommasomarchionni with the maintainer account before publishing.
+* @tommasomarchionni
+/.github/ @tommasomarchionni
+/schema/ @tommasomarchionni
+/docs/protocol.md @tommasomarchionni

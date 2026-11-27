@@ -6,8 +6,9 @@ A release is made by hand from the **Release** workflow. Nothing is published au
 
 These steps need the maintainer's accounts and are not done by the repository:
 
-1. Replace the `OWNER` placeholder with the real account or organization in `package.json`,
-   `.github/CODEOWNERS`, `.github/ISSUE_TEMPLATE/config.yml` and the README badges.
+1. The repository account (`tommasomarchionni`) is set in `package.json`, `.github/CODEOWNERS`,
+   `.github/ISSUE_TEMPLATE/config.yml` and the README badges. Change them together if the
+   repository moves to an organization.
 2. Decide the npm package name and publish scope (the name `omp-channel` may be taken or may be
    better under a scope).
 3. On npmjs.com add a **trusted publisher** for the package: owner, repository, workflow file name

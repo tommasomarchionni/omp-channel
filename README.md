@@ -1,6 +1,6 @@
 # omp-channel
 
-[![CI](https://github.com/OWNER/omp-channel/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/omp-channel/actions/workflows/ci.yml)
+[![CI](https://github.com/tommasomarchionni/omp-channel/actions/workflows/ci.yml/badge.svg)](https://github.com/tommasomarchionni/omp-channel/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Node.js 20+](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)
 
@@ -82,7 +82,7 @@ The steps below are for installing from a clone of this repository, for developm
 ### 1. Install the extension from a clone
 
 ```sh
-git clone https://github.com/OWNER/omp-channel.git
+git clone https://github.com/tommasomarchionni/omp-channel.git
 cd omp-channel
 npm ci
 npm run build

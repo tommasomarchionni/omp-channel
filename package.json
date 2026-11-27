@@ -54,13 +54,13 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/OWNER/omp-channel.git"
+    "url": "git+https://github.com/tommasomarchionni/omp-channel.git"
   },
   "bugs": {
-    "url": "https://github.com/OWNER/omp-channel/issues"
+    "url": "https://github.com/tommasomarchionni/omp-channel/issues"
   },
-  "homepage": "https://github.com/OWNER/omp-channel#readme",
-  "author": "The omp-channel contributors",
+  "homepage": "https://github.com/tommasomarchionni/omp-channel#readme",
+  "author": "Tommaso Marchionni",
   "devDependencies": {
     "@biomejs/biome": "^2.6.9",
     "@oh-my-pi/pi-coding-agent": "19.2.1",
