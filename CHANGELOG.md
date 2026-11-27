@@ -5,6 +5,8 @@ and the project uses [Semantic Versioning](https://semver.org) once it reaches 1
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-27
+
 ### Added
 
 - Failed turn report: when a run ends in a model error, each message it left unanswered is
