@@ -1,6 +1,6 @@
 {
   "name": "omp-channel",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Oh My Pi extension that delivers messages from an external console into an agent session and sends replies back.",
   "license": "Apache-2.0",
   "type": "module",
