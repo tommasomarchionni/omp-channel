@@ -50,7 +50,36 @@ until the open one is closed.
 
 ## Connect a service in three steps
 
-### 1. Install the extension
+### 0. Install from the package registry
+
+The package is not published yet. Until it is, install from a clone (step 1). When it is published,
+the command is:
+
+```sh
+omp install omp-channel
+```
+
+Oh My Pi installs the extension and loads it in its sessions. To check it, start a session and run
+`/channel-status`: it shows the transport in use and, when an adapter is configured, what the
+adapter reports.
+
+A service that needs its own protocol connects through an adapter module (section 6 of
+[docs/protocol.md](docs/protocol.md)). Point `adapterModule` at it in the configuration file, and
+give the adapter the environment it reads:
+
+```json
+{
+  "mcpServer": "my-service",
+  "adapterModule": "/path/to/adapter.mjs",
+  "delivery": { "deliverAs": "followUp" }
+}
+```
+
+Set `OMP_CHANNEL_CONFIG` to the path of that file before starting `omp`.
+
+The steps below are for installing from a clone of this repository, for development.
+
+### 1. Install the extension from a clone
 
 ```sh
 git clone https://github.com/OWNER/omp-channel.git
