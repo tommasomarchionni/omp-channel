@@ -9,6 +9,7 @@ import type { ChannelConfig } from "./config.js";
 import { ACKNOWLEDGED_OUTCOMES, Dispatcher, type SessionPort } from "./dispatcher.js";
 import { parseMcpNotification, parseReplyInput } from "./protocol.js";
 import { jsonSchemaParameters } from "./tool-schema.js";
+import { failedRun } from "./turn.js";
 
 export const REPLY_TOOL_NAME = "reply";
 
@@ -24,7 +25,8 @@ export interface ChannelExtensionOptions {
  * Creates the extension factory. It registers:
  * - `mcp_notification`: messages pushed by the configured MCP server enter the agent;
  * - the `reply` tool: the model answers a message by its messageId;
- * - lifecycle hooks: agent state is reported to the service, and the adapter stops on shutdown;
+ * - lifecycle hooks: agent state and failed turns are reported to the service, and the adapter
+ *   stops on shutdown;
  * - the adapter receive loop, when an adapter is given.
  */
 export function createChannelExtension(options: ChannelExtensionOptions): ExtensionFactory {
@@ -67,8 +69,16 @@ export function createChannelExtension(options: ChannelExtensionOptions): Extens
       dispatcher.setStatus("working");
     });
 
-    pi.on("agent_end", (_event, ctx) => {
+    pi.on("agent_end", (event, ctx) => {
       context = ctx;
+      // A run that Oh My Pi continues (a retry, for example) has not ended: still working.
+      if (event.willContinue === true) {
+        return;
+      }
+      const failed = failedRun(event);
+      if (failed !== undefined) {
+        void dispatcher.reportFailure(failed.messageIds, failed.reason);
+      }
       dispatcher.setStatus("free");
     });
 

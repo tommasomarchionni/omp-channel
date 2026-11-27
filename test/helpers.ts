@@ -9,6 +9,8 @@ import type { SendUserMessageOptions } from "@oh-my-pi/pi-coding-agent/session/a
 /** Lifecycle events used by the fake API. Only the event type is needed. */
 export interface LifecycleEvent {
   type: "session_start" | "agent_start" | "agent_end" | "session_shutdown";
+  willContinue?: boolean;
+  messages?: unknown[];
 }
 
 export interface SentPrompt {
@@ -79,9 +81,13 @@ export function fakePi(sendMode: "accept" | "hold" | "reject" = "accept") {
         handler(event, ctx);
       }
     },
-    lifecycle(name: LifecycleEvent["type"], ctx: ExtensionContext = fakeContext()) {
+    lifecycle(
+      name: LifecycleEvent["type"],
+      ctx: ExtensionContext = fakeContext(),
+      data: Omit<LifecycleEvent, "type"> = { messages: [] },
+    ) {
       for (const handler of lifecycleHandlers.get(name) ?? []) {
-        handler({ type: name }, ctx);
+        handler({ type: name, ...data }, ctx);
       }
     },
     command(name: string) {

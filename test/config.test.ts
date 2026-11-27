@@ -52,7 +52,14 @@ describe("loadConfig", () => {
       ack: "/messages/ack",
       replies: "/replies",
       status: "/status",
+      failures: "/failures",
     });
+  });
+
+  it("sends the error text of a failed turn unless it is turned off", () => {
+    assert.deepEqual(loadConfig(sources({})).failures, { includeReason: true });
+    const off = JSON.stringify({ failures: { includeReason: false } });
+    assert.deepEqual(loadConfig(sources({ [configPath]: off })).failures, { includeReason: false });
   });
 
   it("reads the key from the file named by <keyEnv>_FILE", () => {

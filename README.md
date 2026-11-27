@@ -207,21 +207,22 @@ extension still receives MCP pushes, but replies are reported as not configured.
 validated against [schema/config.schema.json](schema/config.schema.json). An invalid file disables
 the extension and writes the reason (with its path) to stderr.
 
-| Key                        | Default                                             | Meaning                                                                                         |
-| -------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `mcpServer`                | `"omp-channel"`                                     | MCP server name that may push messages.                                                         |
-| `service.url`              | none                                                | Base URL of the service. `https` required; `http` only for loopback.                            |
-| `service.keyEnv`           | `"OMP_CHANNEL_KEY"`                                 | Environment variable holding the key (`<keyEnv>_FILE` for a file). Required with `service.url`. |
-| `service.requestTimeoutMs` | `10000`                                             | Timeout of each request.                                                                        |
-| `service.paths.*`          | `/messages`, `/messages/ack`, `/replies`, `/status` | Endpoint paths.                                                                                 |
-| `poll.intervalMs`          | `2000`                                              | Wait between polls when the queue is empty.                                                     |
-| `poll.maxBackoffMs`        | `30000`                                             | Longest wait after failed polls.                                                                |
-| `poll.batchSize`           | `10`                                                | Deliveries requested per poll.                                                                  |
-| `limits.maxTextLength`     | `4000`                                              | Longest message text, in characters.                                                            |
-| `limits.maxSenderLength`   | `64`                                                | Longest sender name.                                                                            |
-| `limits.maxPending`        | `5`                                                 | Events waiting to be admitted; more are dropped and not acknowledged.                           |
-| `delivery.deliverAs`       | `"followUp"`                                        | How a message is queued in Oh My Pi: `steer`, `followUp` or `aside`.                            |
-| `adapterModule`            | none                                                | Path to a module that exports a `ChannelAdapter`. Replaces the HTTP transport.                  |
+| Key                        | Default                                                          | Meaning                                                                                         |
+| -------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `mcpServer`                | `"omp-channel"`                                                  | MCP server name that may push messages.                                                         |
+| `service.url`              | none                                                             | Base URL of the service. `https` required; `http` only for loopback.                            |
+| `service.keyEnv`           | `"OMP_CHANNEL_KEY"`                                              | Environment variable holding the key (`<keyEnv>_FILE` for a file). Required with `service.url`. |
+| `service.requestTimeoutMs` | `10000`                                                          | Timeout of each request.                                                                        |
+| `service.paths.*`          | `/messages`, `/messages/ack`, `/replies`, `/status`, `/failures` | Endpoint paths.                                                                                 |
+| `poll.intervalMs`          | `2000`                                                           | Wait between polls when the queue is empty.                                                     |
+| `poll.maxBackoffMs`        | `30000`                                                          | Longest wait after failed polls.                                                                |
+| `poll.batchSize`           | `10`                                                             | Deliveries requested per poll.                                                                  |
+| `limits.maxTextLength`     | `4000`                                                           | Longest message text, in characters.                                                            |
+| `limits.maxSenderLength`   | `64`                                                             | Longest sender name.                                                                            |
+| `limits.maxPending`        | `5`                                                              | Events waiting to be admitted; more are dropped and not acknowledged.                           |
+| `delivery.deliverAs`       | `"followUp"`                                                     | How a message is queued in Oh My Pi: `steer`, `followUp` or `aside`.                            |
+| `failures.includeReason`   | `true`                                                           | Send the cleaned error text when a turn fails and leaves a message unanswered.                  |
+| `adapterModule`            | none                                                             | Path to a module that exports a `ChannelAdapter`. Replaces the HTTP transport.                  |
 
 Environment variables:
 
@@ -244,6 +245,16 @@ Environment variables:
   addresses, for local tests.
 - **Replies are limited.** The `reply` tool accepts only a `messageId` that was delivered in the
   current session.
+- **Error text is cleaned.** When a turn fails, the error from the model provider is sent with
+  known secret shapes and the home folder name hidden. `failures.includeReason: false` keeps it on
+  the machine.
+
+## When a turn fails
+
+If the model request fails (the model is not loaded, the key is refused, the service is down) the
+service receives a `failure` report for each message that got no answer, so the person is not left
+waiting. Oh My Pi retries some errors first; the report is sent only when it gives up. See
+[docs/protocol.md](docs/protocol.md), section 9.
 
 Report vulnerabilities privately, as described in [SECURITY.md](SECURITY.md).
 
@@ -261,7 +272,7 @@ Report vulnerabilities privately, as described in [SECURITY.md](SECURITY.md).
   plain JSON Schema where Oh My Pi declares a TypeBox schema.
 - **Verified in a live Oh My Pi session (19.2.1, local model):** startup, delivery of a pushed
   message to an idle session, a message pushed during a turn (taken at a turn boundary, see
-  [docs/protocol.md](docs/protocol.md) section 3.5), and abort.
+  [docs/protocol.md](docs/protocol.md) section 3.5), abort, and the report of a refused model request.
 - **Not verified yet:** the status report (`working`/`free`) to a service, and the effect of each
   `attribution` value. See [docs/omp-verification.md](docs/omp-verification.md).
 - `npm ci` also installs the Oh My Pi package for type checking; it is large.
