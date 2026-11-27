@@ -17,7 +17,7 @@ it work and receive the answers, including while the agent is busy. It is **not*
 service, it contains **no models**, and it does **not** manage accounts. You provide the service
 and the model; omp-channel is the link between them.
 
-> **Status: alpha, version 0.3.0 on npm.** The behaviour is covered by automated tests that use fakes and
+> **Status: alpha, version 0.4.0 on npm.** The behaviour is covered by automated tests that use fakes and
 > a loopback HTTP service. Startup, delivery to an idle session, queueing during a turn and abort
 > have passed in a live Oh My Pi session; the status report and the attribution values are not yet
 > verified. See
