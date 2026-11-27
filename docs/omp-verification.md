@@ -214,3 +214,14 @@ validated (a call with a missing `messageId` must be rejected by Oh My Pi, not b
 
 Do not publish a release until every row above that is marked not verified is verified, or the
 README states the gap explicitly.
+
+## Install from the registry (27/11/2026, version 0.1.0)
+
+Run in a scratch home, not in the maintainer's Oh My Pi configuration:
+
+- `omp install omp-channel` installed `omp-channel@0.1.0` from npm into the plugin folder
+  (`~/.omp/plugins/node_modules`).
+- A session started with that home and no `-e` flag listed the `channel-status` command.
+
+Not checked here: a session with a configuration file and a live service after the registry
+install. The checks above that use `-e` still describe the clone setup.
