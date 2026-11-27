@@ -5,6 +5,8 @@ and the project uses [Semantic Versioning](https://semver.org) once it reaches 1
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-27
+
 ### Added
 
 - Activity reports: for each tool used for a message, a report when it starts and one when it ends
