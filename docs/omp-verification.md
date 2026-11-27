@@ -1,4 +1,5 @@
 ---
+
 title: Verification in Oh My Pi
 description: What was verified in a real Oh My Pi session, and what was not.
 ---
